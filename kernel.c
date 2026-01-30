@@ -1,130 +1,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#if defined(__GNUC__)
-#define ASM_VOLATILE(...) __asm__ __volatile__(__VA_ARGS__)
-#else
-#define ASM_VOLATILE(...)
-#endif
-
-static volatile uint16_t* const VGA = (uint16_t*)0xB8000;
-static const uint16_t VGA_WIDTH = 80;
-static const uint16_t VGA_HEIGHT = 25;
-static uint16_t vga_row = 0;
-static uint16_t vga_col = 0;
-static uint8_t vga_color = 0x0F;
-
-static inline void outb(uint16_t port, uint8_t value)
-{
-    ASM_VOLATILE("outb %0, %1" : : "a"(value), "Nd"(port));
-}
-
-static inline uint8_t inb(uint16_t port)
-{
-    uint8_t value;
-    ASM_VOLATILE("inb %1, %0" : "=a"(value) : "Nd"(port));
-    return value;
-}
-
-static void console_clear(void)
-{
-    for (uint16_t y = 0; y < VGA_HEIGHT; ++y)
-    {
-        for (uint16_t x = 0; x < VGA_WIDTH; ++x)
-        {
-            VGA[y * VGA_WIDTH + x] = (uint16_t)vga_color << 8 | ' ';
-        }
-    }
-    vga_row = 0;
-    vga_col = 0;
-}
-
-static void console_scroll(void)
-{
-    for (uint16_t y = 1; y < VGA_HEIGHT; ++y)
-    {
-        for (uint16_t x = 0; x < VGA_WIDTH; ++x)
-        {
-            VGA[(y - 1) * VGA_WIDTH + x] = VGA[y * VGA_WIDTH + x];
-        }
-    }
-    for (uint16_t x = 0; x < VGA_WIDTH; ++x)
-    {
-        VGA[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = (uint16_t)vga_color << 8 | ' ';
-    }
-    if (vga_row > 0)
-    {
-        vga_row--;
-    }
-}
-
-static void console_putc(char c)
-{
-    if (c == '\n')
-    {
-        vga_col = 0;
-        vga_row++;
-        if (vga_row >= VGA_HEIGHT)
-        {
-            console_scroll();
-        }
-        return;
-    }
-
-    VGA[vga_row * VGA_WIDTH + vga_col] = (uint16_t)vga_color << 8 | (uint8_t)c;
-    vga_col++;
-    if (vga_col >= VGA_WIDTH)
-    {
-        vga_col = 0;
-        vga_row++;
-        if (vga_row >= VGA_HEIGHT)
-        {
-            console_scroll();
-        }
-    }
-}
-
-static void console_write(const char* msg)
-{
-    for (size_t i = 0; msg[i] != '\0'; ++i)
-    {
-        console_putc(msg[i]);
-    }
-}
-
-static void console_backspace(void)
-{
-    if (vga_col == 0 && vga_row == 0)
-    {
-        return;
-    }
-
-    if (vga_col == 0)
-    {
-        vga_row--;
-        vga_col = VGA_WIDTH - 1;
-    }
-    else
-    {
-        vga_col--;
-    }
-
-    VGA[vga_row * VGA_WIDTH + vga_col] = (uint16_t)vga_color << 8 | ' ';
-}
-
-static int str_equals(const char* a, const char* b)
-{
-    size_t i = 0;
-    while (a[i] != '\0' && b[i] != '\0')
-    {
-        if (a[i] != b[i])
-        {
-            return 0;
-        }
-        i++;
-    }
-    return a[i] == '\0' && b[i] == '\0';
-}
+#include "console.h"
+#include "fs/fat.h"
+#include "io.h"
 
 static const char* skip_spaces(const char* s)
 {
@@ -166,6 +45,20 @@ static void print_prompt(void)
     console_write("> ");
 }
 
+static int cmd_is(const char* cmd, size_t len, const char* word)
+{
+    size_t i = 0;
+    while (word[i] != '\0')
+    {
+        if (i >= len || cmd[i] != word[i])
+        {
+            return 0;
+        }
+        i++;
+    }
+    return i == len;
+}
+
 static void execute_command(const char* line)
 {
     const char* cmd = skip_spaces(line);
@@ -174,32 +67,141 @@ static void execute_command(const char* line)
         return;
     }
 
-    if (str_equals(cmd, "help"))
+    size_t cmd_len = 0;
+    while (cmd[cmd_len] != '\0' && cmd[cmd_len] != ' ')
     {
-        console_write("Commands: help, echo, clear, info\n");
+        cmd_len++;
+    }
+    const char* arg = skip_spaces(cmd + cmd_len);
+
+    if (cmd_is(cmd, cmd_len, "help"))
+    {
+        console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write\n");
         return;
     }
 
-    if (str_equals(cmd, "clear"))
+    if (cmd_is(cmd, cmd_len, "clear"))
     {
         console_clear();
         return;
     }
 
-    if (cmd[0] == 'e' && cmd[1] == 'c' && cmd[2] == 'h' && cmd[3] == 'o' && (cmd[4] == ' ' || cmd[4] == '\0'))
+    if (cmd_is(cmd, cmd_len, "echo"))
     {
-        const char* text = skip_spaces(cmd + 4);
-        if (*text != '\0')
-        {
-            console_write(text);
-        }
+        console_write(arg);
         console_putc('\n');
         return;
     }
 
-    if (str_equals(cmd, "info"))
+    if (cmd_is(cmd, cmd_len, "info"))
     {
         console_write("x86 kernel (32-bit, C, VGA)\n");
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "ls"))
+    {
+        if (fat_ls() != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "pwd"))
+    {
+        console_write(fat_pwd());
+        console_putc('\n');
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "cd"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: cd <dir>\n");
+            return;
+        }
+        if (fat_cd(arg) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "mkdir"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: mkdir <name>\n");
+            return;
+        }
+        if (fat_mkdir(arg) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "touch"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: touch <name>\n");
+            return;
+        }
+        if (fat_touch(arg) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "cat"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: cat <name>\n");
+            return;
+        }
+        if (fat_cat(arg) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "write"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: write <name> <text>\n");
+            return;
+        }
+        char name[13];
+        size_t i = 0;
+        while (arg[i] != '\0' && arg[i] != ' ' && i + 1 < sizeof(name))
+        {
+            name[i] = arg[i];
+            i++;
+        }
+        name[i] = '\0';
+        const char* text = skip_spaces(arg + i);
+        if (name[0] == '\0')
+        {
+            console_write("Usage: write <name> <text>\n");
+            return;
+        }
+        if (fat_write(name, text) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
         return;
     }
 
@@ -210,6 +212,12 @@ void kernel_main(void)
 {
     console_clear();
     console_write("Kernel C loaded.\n");
+    if (fat_init() != 0)
+    {
+        console_write("FAT init failed: ");
+        console_write(fat_last_error());
+        console_putc('\n');
+    }
     print_prompt();
 
     char line[128];
