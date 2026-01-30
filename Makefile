@@ -3,17 +3,30 @@
 all: build
 
 BUILD_DIR := build
+ISO_DIR := $(BUILD_DIR)/isodir
+KERNEL_ELF := $(BUILD_DIR)/kernel.elf
+ISO := $(BUILD_DIR)/kernel.iso
 
-build: $(BUILD_DIR)/boot.bin $(BUILD_DIR)/kernel.bin
-	@echo "Building kernel..."
-	@cat $(BUILD_DIR)/boot.bin $(BUILD_DIR)/kernel.bin > $(BUILD_DIR)/kernel.img
+NASMFLAGS := -f elf32
+CFLAGS := -m32 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra
+LDFLAGS := -m elf_i386 -T linker.ld -nostdlib
 
-$(BUILD_DIR)/boot.bin: boot.asm | $(BUILD_DIR)/.dir
-	nasm -f bin boot.asm -o $(BUILD_DIR)/boot.bin
+build: $(ISO)
 
-$(BUILD_DIR)/kernel.bin: kernel.asm | $(BUILD_DIR)/.dir
-	nasm -f bin kernel.asm -o $(BUILD_DIR)/kernel.bin
+$(BUILD_DIR)/entry.o: entry.asm | $(BUILD_DIR)/.dir
+	nasm $(NASMFLAGS) entry.asm -o $(BUILD_DIR)/entry.o
 
+$(BUILD_DIR)/kernel.o: kernel.c | $(BUILD_DIR)/.dir
+	gcc $(CFLAGS) -c kernel.c -o $(BUILD_DIR)/kernel.o
+
+$(KERNEL_ELF): $(BUILD_DIR)/entry.o $(BUILD_DIR)/kernel.o linker.ld | $(BUILD_DIR)/.dir
+	ld $(LDFLAGS) -o $(KERNEL_ELF) $(BUILD_DIR)/entry.o $(BUILD_DIR)/kernel.o
+
+$(ISO): $(KERNEL_ELF) grub/grub.cfg | $(BUILD_DIR)/.dir
+	mkdir -p $(ISO_DIR)/boot/grub
+	cp $(KERNEL_ELF) $(ISO_DIR)/boot/kernel.elf
+	cp grub/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
+	grub-mkrescue -o $(ISO) $(ISO_DIR)
 
 $(BUILD_DIR)/.dir:
 	mkdir -p $(BUILD_DIR)
@@ -22,14 +35,14 @@ $(BUILD_DIR)/.dir:
 
 run: build
 	@echo "Running kernel in QEMU..."
-	qemu-system-i386 -drive format=raw,file=$(BUILD_DIR)/kernel.img
+	qemu-system-i386 -cdrom $(ISO)
 
 clean:
-	rm -f $(BUILD_DIR)/boot.bin $(BUILD_DIR)/kernel.bin $(BUILD_DIR)/kernel.img
+	rm -rf $(BUILD_DIR)
 	@echo "Cleaned build files"
 
 help:
-	@echo "x86 Kernel Build System"
-	@echo "make build - Build the kernel"
+	@echo "x86 Kernel Build System (Multiboot + C)"
+	@echo "make build - Build GRUB ISO"
 	@echo "make run   - Build and run in QEMU"
 	@echo "make clean - Remove build files"
