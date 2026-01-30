@@ -21,6 +21,15 @@ static const char scancode_map[128] = {
     '\\','z','x','c','v','b','n','m',',','.','/', 0, '*', 0, ' ',
 };
 
+
+#define HISTORY_MAX 20
+#define HISTORY_SIZE 128
+static char g_history[HISTORY_MAX][HISTORY_SIZE];
+static int g_history_count = 0;
+static int g_history_head = 0;
+static int g_history_index = -1;
+static uint8_t g_extended_scancode = 0;
+
 static int keyboard_has_data(void)
 {
     return (inb(0x64) & 0x01) != 0;
@@ -29,6 +38,27 @@ static int keyboard_has_data(void)
 static char keyboard_read_char(void)
 {
     uint8_t scancode = inb(0x60);
+    
+    if (scancode == 0xE0)
+    {
+        g_extended_scancode = 1;
+        return 0;
+    }
+    
+    if (g_extended_scancode)
+    {
+        g_extended_scancode = 0;
+        if (scancode == 0x48)
+        {
+            return 1;
+        }
+        if (scancode == 0x50)
+        {
+            return 2;
+        }
+        return 0;
+    }
+    
     if (scancode & 0x80)
     {
         return 0;
@@ -40,6 +70,61 @@ static char keyboard_read_char(void)
     return 0;
 }
 
+static void history_add(const char* cmd)
+{
+    size_t i = 0;
+    while (cmd[i] != '\0' && i + 1 < HISTORY_SIZE)
+    {
+        g_history[g_history_head][i] = cmd[i];
+        i++;
+    }
+    g_history[g_history_head][i] = '\0';
+
+    g_history_head = (g_history_head + 1) % HISTORY_MAX;
+    if (g_history_count < HISTORY_MAX)
+    {
+        g_history_count++;
+    }
+    g_history_index = -1;
+}
+
+static const char* history_up(void)
+{
+    if (g_history_count == 0)
+    {
+        return "";
+    }
+    if (g_history_index == -1)
+    {
+        g_history_index = (g_history_head - 1 + HISTORY_MAX) % HISTORY_MAX;
+    }
+    else
+    {
+        int next = (g_history_index - 1 + HISTORY_MAX) % HISTORY_MAX;
+        int oldest = (g_history_head - g_history_count + HISTORY_MAX) % HISTORY_MAX;
+        if (g_history_index != oldest)
+        {
+            g_history_index = next;
+        }
+    }
+    return g_history[g_history_index];
+}
+
+static const char* history_down(void)
+{
+    if (g_history_count == 0 || g_history_index == -1)
+    {
+        return "";
+    }
+    int newest = (g_history_head - 1 + HISTORY_MAX) % HISTORY_MAX;
+    if (g_history_index == newest)
+    {
+        g_history_index = -1;
+        return "";
+    }
+    g_history_index = (g_history_index + 1) % HISTORY_MAX;
+    return g_history[g_history_index];
+}
 static void print_prompt(void)
 {
     console_write("> ");
@@ -77,6 +162,7 @@ static void execute_command(const char* line)
     if (cmd_is(cmd, cmd_len, "help"))
     {
         console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write, df\n");
+        console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
 
@@ -246,6 +332,42 @@ void kernel_main(void)
             continue;
         }
 
+        if (c == 1)  // up arrow
+        {
+            const char* hist = history_up();
+            for (size_t i = 0; i < len; i++)
+            {
+                console_backspace();
+            }
+            len = 0;
+            while (hist[len] != '\0' && len + 1 < sizeof(line))
+            {
+                line[len] = hist[len];
+                console_putc(hist[len]);
+                len++;
+            }
+            line[len] = '\0';
+            continue;
+        }
+
+        if (c == 2)  // down arrow
+        {
+            const char* hist = history_down();
+            for (size_t i = 0; i < len; i++)
+            {
+                console_backspace();
+            }
+            len = 0;
+            while (hist[len] != '\0' && len + 1 < sizeof(line))
+            {
+                line[len] = hist[len];
+                console_putc(hist[len]);
+                len++;
+            }
+            line[len] = '\0';
+            continue;
+        }
+
         if (c == '\b')
         {
             if (len > 0)
@@ -261,6 +383,10 @@ void kernel_main(void)
         {
             console_putc('\n');
             line[len] = '\0';
+            if (line[0] != '\0')
+            {
+                history_add(line);
+            }
             execute_command(line);
             len = 0;
             line[0] = '\0';
