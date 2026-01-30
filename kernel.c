@@ -130,6 +130,20 @@ static void print_prompt(void)
     console_write("> ");
 }
 
+static void shutdown(void)
+{
+    outw(0x604, 0x2000);
+    outw(0xB004, 0x2000);
+}
+
+static void restart(void)
+{
+    while (inb(0x64) & 0x02)
+    {
+    }
+    outb(0x64, 0xFE);
+}
+
 static int cmd_is(const char* cmd, size_t len, const char* word)
 {
     size_t i = 0;
@@ -161,7 +175,7 @@ static void execute_command(const char* line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write, df\n");
+        console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write, df, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
@@ -298,6 +312,20 @@ static void execute_command(const char* line)
             console_write(fat_last_error());
             console_putc('\n');
         }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "shutdown"))
+    {
+        console_write("Shutting down...\n");
+        shutdown();
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "restart"))
+    {
+        console_write("Restarting...\n");
+        restart();
         return;
     }
 
