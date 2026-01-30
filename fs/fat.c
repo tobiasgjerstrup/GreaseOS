@@ -74,6 +74,31 @@ const char* fat_last_error(void)
     return g_error;
 }
 
+static void uint32_to_str(uint32_t num, char* buf, size_t size)
+{
+    if (size < 2) return;
+    if (num == 0)
+    {
+        buf[0] = '0';
+        buf[1] = '\0';
+        return;
+    }
+    char temp[32];
+    int len = 0;
+    uint32_t n = num;
+    while (n > 0)
+    {
+        temp[len++] = '0' + (n % 10);
+        n /= 10;
+    }
+    int idx = 0;
+    for (int i = len - 1; i >= 0 && idx + 1 < (int)size; i--)
+    {
+        buf[idx++] = temp[i];
+    }
+    buf[idx] = '\0';
+}
+
 static int fat_make_name(const char* input, char out[11])
 {
     for (int i = 0; i < 11; ++i)
@@ -988,6 +1013,59 @@ int fat_cat(const char* name)
     }
 
     console_putc('\n');
+    return 0;
+}
+
+int fat_df(void)
+{
+    uint32_t entries_per_sector = g_fs.bytes_per_sector / 2;
+    uint32_t total_entries = (uint32_t)g_fs.sectors_per_fat * entries_per_sector;
+    uint32_t free_clusters = 0;
+    uint32_t used_clusters = 0;
+
+    for (uint32_t entry = 2; entry < total_entries; ++entry)
+    {
+        uint32_t fat_offset = entry * 2;
+        uint32_t fat_sector = g_fs.reserved_sectors + (fat_offset / g_fs.bytes_per_sector);
+        uint32_t fat_index = fat_offset % g_fs.bytes_per_sector;
+
+        uint8_t sector[512];
+        if (fat_read_sector(fat_sector, sector) != 0)
+        {
+            return -1;
+        }
+
+        uint16_t value = (uint16_t)sector[fat_index] | ((uint16_t)sector[fat_index + 1] << 8);
+        if (value == 0x0000)
+        {
+            free_clusters++;
+        }
+        else
+        {
+            used_clusters++;
+        }
+    }
+
+    uint32_t cluster_size_kb = (uint32_t)g_fs.bytes_per_sector * g_fs.sectors_per_cluster / 1024;
+    uint32_t total_size_kb = (free_clusters + used_clusters) * cluster_size_kb;
+    uint32_t used_size_kb = used_clusters * cluster_size_kb;
+    uint32_t free_size_kb = free_clusters * cluster_size_kb;
+
+    char buf[32];
+    console_write("Disk usage:\n");
+    console_write("Total: ");
+    uint32_to_str(total_size_kb, buf, sizeof(buf));
+    console_write(buf);
+    console_write(" KB\n");
+    console_write("Used:  ");
+    uint32_to_str(used_size_kb, buf, sizeof(buf));
+    console_write(buf);
+    console_write(" KB\n");
+    console_write("Free:  ");
+    uint32_to_str(free_size_kb, buf, sizeof(buf));
+    console_write(buf);
+    console_write(" KB\n");
+
     return 0;
 }
 

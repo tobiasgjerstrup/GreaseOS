@@ -76,7 +76,7 @@ static void execute_command(const char* line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write\n");
+        console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write, df\n");
         return;
     }
 
@@ -198,6 +198,16 @@ static void execute_command(const char* line)
             return;
         }
         if (fat_write(name, text) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "df"))
+    {
+        if (fat_df() != 0)
         {
             console_write(fat_last_error());
             console_putc('\n');

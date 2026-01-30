@@ -12,3 +12,4 @@ int fat_touch(const char* name);
 int fat_cat(const char* name);
 int fat_write(const char* name, const char* data);
 const char* fat_last_error(void);
+int fat_df(void);
