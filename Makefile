@@ -9,6 +9,8 @@ ISO := $(BUILD_DIR)/kernel.iso
 ISO_TMP := /tmp/kernel.iso
 DISK_IMG := $(BUILD_DIR)/disk.img
 DISK_SIZE_MB := 16
+VHD_IMG := $(BUILD_DIR)/disk.vhd
+VHDX_IMG := $(BUILD_DIR)/disk.vhdx
 
 NASMFLAGS := -f elf32
 CFLAGS := -m32 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra -I.
@@ -50,6 +52,14 @@ run: build $(DISK_IMG)
 	@echo "Running kernel in QEMU..."
 	qemu-system-i386 -boot d -cdrom $(ISO) -drive file=$(DISK_IMG),format=raw,if=ide
 
+vhd: $(DISK_IMG)
+	@echo "Converting raw disk to VHD..."
+	qemu-img convert -f raw -O vpc $(DISK_IMG) $(VHD_IMG)
+
+vhdx: $(DISK_IMG)
+	@echo "Converting raw disk to VHDX..."
+	qemu-img convert -f raw -O vhdx $(DISK_IMG) $(VHDX_IMG)
+
 clean:
 	rm -rf $(BUILD_DIR)
 	@echo "Cleaned build files"
@@ -58,4 +68,6 @@ help:
 	@echo "x86 Kernel Build System (Multiboot + C)"
 	@echo "make build - Build GRUB ISO"
 	@echo "make run   - Build and run in QEMU"
+	@echo "make vhd   - Convert build/disk.img to build/disk.vhd"
+	@echo "make vhdx  - Convert build/disk.img to build/disk.vhdx"
 	@echo "make clean - Remove build files"

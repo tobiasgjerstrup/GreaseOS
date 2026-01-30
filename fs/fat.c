@@ -206,7 +206,13 @@ static uint32_t fat_cluster_to_lba(uint16_t cluster)
 
 static int fat_read_sector(uint32_t lba, uint8_t* buffer)
 {
-    if (ata_read_sector(g_fs.base_lba + lba, buffer) != 0)
+    int rc = ata_read_sector(g_fs.base_lba + lba, buffer);
+    if (rc == -2)
+    {
+        set_error("No ATA device");
+        return -1;
+    }
+    if (rc != 0)
     {
         set_error("Disk read failed");
         return -1;
@@ -216,7 +222,13 @@ static int fat_read_sector(uint32_t lba, uint8_t* buffer)
 
 static int fat_write_sector(uint32_t lba, const uint8_t* buffer)
 {
-    if (ata_write_sector(g_fs.base_lba + lba, buffer) != 0)
+    int rc = ata_write_sector(g_fs.base_lba + lba, buffer);
+    if (rc == -2)
+    {
+        set_error("No ATA device");
+        return -1;
+    }
+    if (rc != 0)
     {
         set_error("Disk write failed");
         return -1;

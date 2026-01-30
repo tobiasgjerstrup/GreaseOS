@@ -20,8 +20,15 @@ A basic x86 kernel (Multiboot + C).
 # Using make
 make build          # Build GRUB ISO
 make run            # Build and run in QEMU (creates build/disk.img if missing)
+make vhd            # Convert build/disk.img to build/disk.vhd (Hyper-V)
+make vhdx           # Convert build/disk.img to build/disk.vhdx (Hyper-V)
 make clean          # Clean build files
 ```
+
+### Hyper-V notes
+- Use a Gen1 VM (legacy BIOS) with an IDE-attached data disk.
+- The kernel expects a raw FAT16 disk image like build/disk.img. If you use Hyper-V, convert that image to a fixed VHD/VHDX and attach it as an IDE disk (IDE 0:1 is typical).
+- If you attach a blank VHD/VHDX, you will see “FAT init failed: No boot sector”.
 
 ### Files
 - `entry.asm` - Multiboot entry stub

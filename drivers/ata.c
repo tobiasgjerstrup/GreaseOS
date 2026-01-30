@@ -56,6 +56,17 @@ static void ata_select_drive(uint32_t lba)
 
 int ata_read_sector(uint32_t lba, uint8_t* buffer)
 {
+    uint8_t status = inb(ATA_STATUS);
+    if (status == 0xFF)
+    {
+        io_wait();
+        status = inb(ATA_STATUS);
+        if (status == 0xFF)
+        {
+            return -2;
+        }
+    }
+
     if (ata_wait_busy() != 0)
     {
         return -1;
@@ -85,6 +96,17 @@ int ata_read_sector(uint32_t lba, uint8_t* buffer)
 
 int ata_write_sector(uint32_t lba, const uint8_t* buffer)
 {
+    uint8_t status = inb(ATA_STATUS);
+    if (status == 0xFF)
+    {
+        io_wait();
+        status = inb(ATA_STATUS);
+        if (status == 0xFF)
+        {
+            return -2;
+        }
+    }
+
     if (ata_wait_busy() != 0)
     {
         return -1;
