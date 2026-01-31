@@ -1,7 +1,7 @@
-# the-x86-project
+# GreaseOS previously known as the-x86-project
 I am bored.
 
-## Kernel Project
+## GreaseOS
 
 A basic x86 kernel (Multiboot + C).
 
@@ -43,16 +43,27 @@ make clean          # Clean build files
 ### Shell Commands
 - `help` - List available commands
 - `ls`, `cd`, `pwd`, `mkdir`, `touch` - File system operations
-- `cat <file>`, `write <file> <text>` - Read/write files
-- `v <file>` - Open text editor
-- `exec <file>` - Execute flat binary program
-- `hw` - Show hardware information
+- `rmdir`, `rm`, `cp` - Remove/copy files or directories
+- `cat <file>`, `write <file> <text>`, `echo <text>` - Read/write/print text
+- `v <file>` - Open full-screen text editor
+- `paste` - Paste clipboard contents into the editor
+- `exec <file>` - Execute a flat binary program (no ELF yet)
+- `info`, `hw` - Show kernel and hardware information
 - `df` - Show disk usage
+- `snake` - Launch the snake game
+- `ss` - Show simple system stats
 - `clear` - Clear screen
 - `shutdown`, `restart` - Power control
 
+### Editor Notes
+- `v <file>` opens a full-screen editor with a status line.
+- `Ctrl+S` saves, `Ctrl+Q` quits, and `Ctrl+V` pastes from the clipboard.
+- Use `paste` from the shell to load clipboard contents into the editor.
+
 ### Running Programs
-See [examples/README.md](examples/README.md) for how to write and compile user programs.
+See [tools/examples/README.md](tools/examples/README.md) for how to write and compile user programs (flat binaries only).
+
+**Note:** `exec` currently supports only flat binaries (raw `.bin`); ELF loading is not implemented yet.
 
 Quick example:
 ```bash
@@ -75,6 +86,8 @@ make run
 - `console.c` - VGA text console
 - `keyboard.c` - Keyboard input with arrow keys and Ctrl support
 - `editor.c` - Full-screen text editor (`v` command)
+- `clipboard.c` - Clipboard support used by `paste`
+- `snake.c` - Snake game (`snake` command)
 - `hwinfo.c` - Hardware information display (`hw` command)
 - `exec.c` - Binary execution engine with syscall interface
 - `drivers/ata.c` - ATA PIO disk I/O
@@ -84,8 +97,3 @@ make run
 - `grub/grub.cfg` - GRUB config (32-bit)
 - `grub/grub64.cfg` - GRUB config (64-bit)
 - `Makefile` - Build automation
-
-### hello world
-```bash
-nasm -f elf64 ./sidequests/helloworld.asm -o ./build/app.o && ld ./build/app.o -o ./build/app && ./build/app
-```
