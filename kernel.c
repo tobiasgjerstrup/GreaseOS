@@ -8,7 +8,7 @@
 #include "editor.h"
 #include "hwinfo.h"
 
-static const char* skip_spaces(const char* s)
+static const char *skip_spaces(const char *s)
 {
     while (*s == ' ')
     {
@@ -24,7 +24,7 @@ static int g_history_count = 0;
 static int g_history_head = 0;
 static int g_history_index = -1;
 
-static void history_add(const char* cmd)
+static void history_add(const char *cmd)
 {
     size_t i = 0;
     while (cmd[i] != '\0' && i + 1 < HISTORY_SIZE)
@@ -42,7 +42,7 @@ static void history_add(const char* cmd)
     g_history_index = -1;
 }
 
-static const char* history_up(void)
+static const char *history_up(void)
 {
     if (g_history_count == 0)
     {
@@ -64,7 +64,7 @@ static const char* history_up(void)
     return g_history[g_history_index];
 }
 
-static const char* history_down(void)
+static const char *history_down(void)
 {
     if (g_history_count == 0 || g_history_index == -1)
     {
@@ -98,7 +98,7 @@ static void restart(void)
     outb(0x64, 0xFE);
 }
 
-static int cmd_is(const char* cmd, size_t len, const char* word)
+static int cmd_is(const char *cmd, size_t len, const char *word)
 {
     size_t i = 0;
     while (word[i] != '\0')
@@ -112,9 +112,9 @@ static int cmd_is(const char* cmd, size_t len, const char* word)
     return i == len;
 }
 
-static void execute_command(const char* line)
+static void execute_command(const char *line)
 {
-    const char* cmd = skip_spaces(line);
+    const char *cmd = skip_spaces(line);
     if (*cmd == '\0')
     {
         return;
@@ -125,7 +125,7 @@ static void execute_command(const char* line)
     {
         cmd_len++;
     }
-    const char* arg = skip_spaces(cmd + cmd_len);
+    const char *arg = skip_spaces(cmd + cmd_len);
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
@@ -149,7 +149,11 @@ static void execute_command(const char* line)
 
     if (cmd_is(cmd, cmd_len, "info"))
     {
+#if defined(__x86_64__) || defined(__amd64__)
+        console_write("x86 kernel (64-bit, C, VGA)\n");
+#else
         console_write("x86 kernel (32-bit, C, VGA)\n");
+#endif
         return;
     }
 
@@ -251,7 +255,7 @@ static void execute_command(const char* line)
             i++;
         }
         name[i] = '\0';
-        const char* text = skip_spaces(arg + i);
+        const char *text = skip_spaces(arg + i);
         if (name[0] == '\0')
         {
             console_write("Usage: write <name> <text>\n");
@@ -329,6 +333,11 @@ void kernel_main(void)
         console_write(fat_last_error());
         console_putc('\n');
     }
+#if defined(__x86_64__) || defined(__amd64__)
+    console_write("x86 kernel (64-bit, C, VGA)\n");
+#else
+    console_write("x86 kernel (32-bit, C, VGA)\n");
+#endif
     print_prompt();
 
     char line[128];
@@ -349,7 +358,7 @@ void kernel_main(void)
 
         if (c == KEY_UP)
         {
-            const char* hist = history_up();
+            const char *hist = history_up();
             for (size_t i = 0; i < len; i++)
             {
                 console_backspace();
@@ -367,7 +376,7 @@ void kernel_main(void)
 
         if (c == KEY_DOWN)
         {
-            const char* hist = history_down();
+            const char *hist = history_down();
             for (size_t i = 0; i < len; i++)
             {
                 console_backspace();

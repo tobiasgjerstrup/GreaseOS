@@ -18,12 +18,23 @@ A basic x86 kernel (Multiboot + C).
 **Build commands:**
 ```bash
 # Using make
-make build          # Build GRUB ISO
-make run            # Build and run in QEMU (creates build/disk.img if missing)
+make build          # Build 32-bit GRUB ISO (build/kernel.iso)
+make build64        # Build 64-bit GRUB ISO (build/kernel64.iso)
+make run            # Build and run 32-bit in QEMU
+make run64          # Build and run 64-bit in QEMU
 make vhd            # Convert build/disk.img to build/disk.vhd (Hyper-V)
 make vhdx           # Convert build/disk.img to build/disk.vhdx (Hyper-V)
 make clean          # Clean build files
 ```
+
+**Architecture Support:**
+- **32-bit (i386)**: Standard Multiboot, runs on any x86 CPU
+- **64-bit (x86_64)**: Multiboot2 with long mode, requires 64-bit CPU
+
+**For USB boot:**
+- 32-bit: `sudo dd if=build/kernel.iso of=/dev/sdX bs=4M status=progress oflag=sync`
+- 64-bit: `sudo dd if=build/kernel64.iso of=/dev/sdX bs=4M status=progress oflag=sync`
+- (Replace `/dev/sdX` with your USB device)
 
 ### Hyper-V notes
 - Use a Gen1 VM (legacy BIOS) with an IDE-attached data disk.
@@ -31,13 +42,19 @@ make clean          # Clean build files
 - If you attach a blank VHD/VHDX, you will see “FAT init failed: No boot sector”.
 
 ### Files
-- `entry.asm` - Multiboot entry stub
+- `entry.asm` - Multiboot entry stub (32-bit)
+- `entry64.asm` - Multiboot2 entry stub with long mode setup (64-bit)
 - `kernel.c` - C kernel entry (`kernel_main`) with shell
 - `console.c` - VGA text console
+- `keyboard.c` - Keyboard input with arrow keys and Ctrl support
+- `editor.c` - Full-screen text editor (`v` command)
+- `hwinfo.c` - Hardware information display (`hw` command)
 - `drivers/ata.c` - ATA PIO disk I/O
-- `fs/fat.c` - FAT16 filesystem
-- `linker.ld` - Kernel linker script
-- `grub/grub.cfg` - GRUB config
+- `fs/fat.c` - FAT16 filesystem with multi-cluster support
+- `linker.ld` - Kernel linker script (32-bit)
+- `linker64.ld` - Kernel linker script (64-bit)
+- `grub/grub.cfg` - GRUB config (32-bit)
+- `grub/grub64.cfg` - GRUB config (64-bit)
 - `Makefile` - Build automation
 
 ### hello world
