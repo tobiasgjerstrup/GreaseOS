@@ -18,12 +18,12 @@ VHDX_IMG := $(BUILD_DIR)/disk.vhdx
 
 NASMFLAGS_32 := -f elf32
 NASMFLAGS_64 := -f elf64
-CFLAGS_32 := -m32 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra -I.
-CFLAGS_64 := -m64 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra -I. -mcmodel=large -mno-red-zone
-LDFLAGS_32 := -m elf_i386 -T linker.ld -nostdlib
-LDFLAGS_64 := -m elf_x86_64 -T linker64.ld -nostdlib
+CFLAGS_32 := -m32 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra -I. -Iinclude -Ikernel
+CFLAGS_64 := -m64 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra -I. -Iinclude -Ikernel -mcmodel=large -mno-red-zone
+LDFLAGS_32 := -m elf_i386 -T arch/x86/linker/linker.ld -nostdlib
+LDFLAGS_64 := -m elf_x86_64 -T arch/x86/linker/linker64.ld -nostdlib
 
-C_SOURCES := kernel.c console.c keyboard.c editor.c hwinfo.c exec.c snake.c clipboard.c drivers/ata.c fs/fat.c
+C_SOURCES := kernel/kernel.c kernel/console.c kernel/keyboard.c kernel/editor.c kernel/hwinfo.c kernel/exec.c kernel/snake.c kernel/clipboard.c drivers/ata.c fs/fat.c
 C_OBJS_32 := $(C_SOURCES:%.c=$(BUILD_DIR)/32/%.o)
 C_OBJS_64 := $(C_SOURCES:%.c=$(BUILD_DIR)/64/%.o)
 
@@ -31,11 +31,11 @@ build: $(ISO)
 
 build64: $(ISO_64)
 
-$(BUILD_DIR)/entry32.o: entry.asm | $(BUILD_DIR)/.dir
-	nasm $(NASMFLAGS_32) entry.asm -o $(BUILD_DIR)/entry32.o
+$(BUILD_DIR)/entry32.o: arch/x86/boot/entry.asm | $(BUILD_DIR)/.dir
+	nasm $(NASMFLAGS_32) arch/x86/boot/entry.asm -o $(BUILD_DIR)/entry32.o
 
-$(BUILD_DIR)/entry64.o: entry64.asm | $(BUILD_DIR)/.dir
-	nasm $(NASMFLAGS_64) entry64.asm -o $(BUILD_DIR)/entry64.o
+$(BUILD_DIR)/entry64.o: arch/x86/boot/entry64.asm | $(BUILD_DIR)/.dir
+	nasm $(NASMFLAGS_64) arch/x86/boot/entry64.asm -o $(BUILD_DIR)/entry64.o
 
 $(BUILD_DIR)/32/%.o: %.c | $(BUILD_DIR)/.dir
 	@mkdir -p $(dir $@)
@@ -45,10 +45,10 @@ $(BUILD_DIR)/64/%.o: %.c | $(BUILD_DIR)/.dir
 	@mkdir -p $(dir $@)
 	gcc $(CFLAGS_64) -c $< -o $@
 
-$(KERNEL_ELF): $(BUILD_DIR)/entry32.o $(C_OBJS_32) linker.ld | $(BUILD_DIR)/.dir
+$(KERNEL_ELF): $(BUILD_DIR)/entry32.o $(C_OBJS_32) arch/x86/linker/linker.ld | $(BUILD_DIR)/.dir
 	ld $(LDFLAGS_32) -o $(KERNEL_ELF) $(BUILD_DIR)/entry32.o $(C_OBJS_32)
 
-$(KERNEL_ELF_64): $(BUILD_DIR)/entry64.o $(C_OBJS_64) linker64.ld | $(BUILD_DIR)/.dir
+$(KERNEL_ELF_64): $(BUILD_DIR)/entry64.o $(C_OBJS_64) arch/x86/linker/linker64.ld | $(BUILD_DIR)/.dir
 	ld $(LDFLAGS_64) -o $(KERNEL_ELF_64) $(BUILD_DIR)/entry64.o $(C_OBJS_64)
 
 $(ISO): $(KERNEL_ELF) grub/grub.cfg | $(BUILD_DIR)/.dir

@@ -28,11 +28,11 @@ manual:
 	@echo "Manual installation steps:"
 	@echo ""
 	@echo "Option 1: Using mtools (if installed):"
-	@echo "  mcopy -i ../build/disk.img -o *.bin ::"
+	@echo "  mcopy -i ../../build/disk.img -o *.bin ::"
 	@echo ""
 	@echo "Option 2: Mount and copy:"
 	@echo "  sudo mkdir -p /mnt/osdisk"
-	@echo "  sudo mount -o loop ../build/disk.img /mnt/osdisk"
+	@echo "  sudo mount -o loop ../../build/disk.img /mnt/osdisk"
 	@echo "  sudo cp *.bin /mnt/osdisk/"
 	@echo "  sudo umount /mnt/osdisk"
 	@echo ""
@@ -47,11 +47,11 @@ manual:
 	@echo ""
 
 install: all
-	@if [ ! -f ../build/disk.img ]; then \
-		echo "Error: ../build/disk.img does not exist."; \
+	@if [ ! -f ../../build/disk.img ]; then \
+		echo "Error: ../../build/disk.img does not exist."; \
 		echo ""; \
 		echo "First, create the disk image by running:"; \
-		echo "  cd .. && make run"; \
+		echo "  cd ../.. && make run"; \
 		echo ""; \
 		echo "Then try 'make install' again."; \
 		exit 1; \
@@ -60,18 +60,18 @@ install: all
 	@echo ""
 	@if command -v mcopy >/dev/null 2>&1; then \
 		echo "Using mtools (mcopy)..."; \
-		mcopy -i ../build/disk.img -o *.bin :: && \
+		mcopy -i ../../build/disk.img -o *.bin :: && \
 		echo "Success! Binaries installed." && \
-		echo "Run 'cd .. && make run' and use 'exec <program>' in the OS."; \
+		echo "Run 'cd ../.. && make run' and use 'exec <program>' in the OS."; \
 	else \
 		echo "mtools not found. Trying mount method..."; \
 		mkdir -p /tmp/osdisk && \
-		sudo mount -o loop ../build/disk.img /tmp/osdisk && \
+		sudo mount -o loop ../../build/disk.img /tmp/osdisk && \
 		sudo cp *.bin /tmp/osdisk/ && \
 		sudo umount /tmp/osdisk && \
 		rmdir /tmp/osdisk && \
 		echo "Success! Binaries installed." && \
-		echo "Run 'cd .. && make run' and use 'exec <program>' in the OS." || \
+		echo "Run 'cd ../.. && make run' and use 'exec <program>' in the OS." || \
 		(rmdir /tmp/osdisk 2>/dev/null; \
 		 echo ""; \
 		 echo "Installation failed. Try:"; \
