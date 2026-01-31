@@ -130,7 +130,7 @@ static void execute_command(const char *line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, touch, cat, write, v, exec, df, shutdown, restart\n");
+        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, touch, cat, write, v, exec, ss, df, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
@@ -305,6 +305,79 @@ static void execute_command(const char *line)
             return;
         }
         exec_run(arg);
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "ss"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: ss <file>\n");
+            return;
+        }
+        char filename[13];
+        size_t i = 0;
+        while (arg[i] != '\0' && arg[i] != ' ' && i + 1 < sizeof(filename))
+        {
+            filename[i] = arg[i];
+            i++;
+        }
+        filename[i] = '\0';
+        
+        char script_buffer[4096];
+        size_t script_size = 0;
+        
+        if (fat_read(filename, script_buffer, sizeof(script_buffer) - 1, &script_size) != 0)
+        {
+            console_write("ss: ");
+            console_write(fat_last_error());
+            console_putc('\n');
+            return;
+        }
+        
+        script_buffer[script_size] = '\0';
+        
+        size_t line_start = 0;
+        size_t pos = 0;
+        
+        while (pos <= script_size)
+        {
+            if (pos == script_size || script_buffer[pos] == '\n')
+            {
+                char line_buffer[128];
+                size_t line_len = pos - line_start;
+                
+                if (line_len > 0 && script_buffer[line_start + line_len - 1] == '\r')
+                {
+                    line_len--;
+                }
+                
+                if (line_len >= sizeof(line_buffer))
+                {
+                    line_len = sizeof(line_buffer) - 1;
+                }
+                
+                for (size_t j = 0; j < line_len; j++)
+                {
+                    line_buffer[j] = script_buffer[line_start + j];
+                }
+                line_buffer[line_len] = '\0';
+                
+                const char *trimmed = skip_spaces(line_buffer);
+                if (trimmed[0] != '\0' && trimmed[0] != '#')
+                {
+                    console_write(">> ");
+                    console_write(trimmed);
+                    console_putc('\n');
+                    execute_command(trimmed);
+                }
+                
+                line_start = pos + 1;
+            }
+            pos++;
+        }
+        
+        console_write("ss: script finished\n");
         return;
     }
 
