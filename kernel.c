@@ -8,6 +8,7 @@
 #include "editor.h"
 #include "hwinfo.h"
 #include "exec.h"
+#include "snake.h"
 
 static const char *skip_spaces(const char *s)
 {
@@ -130,7 +131,7 @@ static void execute_command(const char *line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, touch, cat, write, v, exec, ss, df, shutdown, restart\n");
+        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, touch, cat, write, v, exec, ss, df, snake, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
@@ -388,6 +389,20 @@ static void execute_command(const char *line)
             console_write(fat_last_error());
             console_putc('\n');
         }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "snake"))
+    {
+        snake_game_run();
+        console_clear();
+        console_write("Kernel C loaded.\n");
+#if defined(__x86_64__) || defined(__amd64__)
+        console_write("x86 kernel (64-bit, C, VGA)\n");
+#else
+        console_write("x86 kernel (32-bit, C, VGA)\n");
+#endif
+        print_prompt();
         return;
     }
 
