@@ -4,6 +4,8 @@
 #include "console.h"
 #include "fs/fat.h"
 #include "io.h"
+#include "keyboard.h"
+#include "editor.h"
 
 static const char* skip_spaces(const char* s)
 {
@@ -14,61 +16,12 @@ static const char* skip_spaces(const char* s)
     return s;
 }
 
-static const char scancode_map[128] = {
-    0,  27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
-    '\t','q','w','e','r','t','y','u','i','o','p','[',']','\n',0,
-    'a','s','d','f','g','h','j','k','l',';','\'', '`', 0,
-    '\\','z','x','c','v','b','n','m',',','.','/', 0, '*', 0, ' ',
-};
-
-
 #define HISTORY_MAX 20
 #define HISTORY_SIZE 128
 static char g_history[HISTORY_MAX][HISTORY_SIZE];
 static int g_history_count = 0;
 static int g_history_head = 0;
 static int g_history_index = -1;
-static uint8_t g_extended_scancode = 0;
-
-static int keyboard_has_data(void)
-{
-    return (inb(0x64) & 0x01) != 0;
-}
-
-static char keyboard_read_char(void)
-{
-    uint8_t scancode = inb(0x60);
-    
-    if (scancode == 0xE0)
-    {
-        g_extended_scancode = 1;
-        return 0;
-    }
-    
-    if (g_extended_scancode)
-    {
-        g_extended_scancode = 0;
-        if (scancode == 0x48)
-        {
-            return 1;
-        }
-        if (scancode == 0x50)
-        {
-            return 2;
-        }
-        return 0;
-    }
-    
-    if (scancode & 0x80)
-    {
-        return 0;
-    }
-    if (scancode < sizeof(scancode_map))
-    {
-        return scancode_map[scancode];
-    }
-    return 0;
-}
 
 static void history_add(const char* cmd)
 {
@@ -175,7 +128,7 @@ static void execute_command(const char* line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write, df, shutdown, restart\n");
+        console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write, v, df, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
@@ -305,6 +258,33 @@ static void execute_command(const char* line)
         return;
     }
 
+    if (cmd_is(cmd, cmd_len, "v"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: v <name>\n");
+            return;
+        }
+        char name[13];
+        size_t i = 0;
+        while (arg[i] != '\0' && arg[i] != ' ' && i + 1 < sizeof(name))
+        {
+            name[i] = arg[i];
+            i++;
+        }
+        name[i] = '\0';
+        if (name[0] == '\0')
+        {
+            console_write("Usage: v <name>\n");
+            return;
+        }
+        if (editor_run(name) != 0)
+        {
+            console_write("Editor error\n");
+        }
+        return;
+    }
+
     if (cmd_is(cmd, cmd_len, "df"))
     {
         if (fat_df() != 0)
@@ -354,13 +334,13 @@ void kernel_main(void)
             continue;
         }
 
-        char c = keyboard_read_char();
+        int c = keyboard_read_key();
         if (c == 0)
         {
             continue;
         }
 
-        if (c == 1)  // up arrow
+        if (c == KEY_UP)
         {
             const char* hist = history_up();
             for (size_t i = 0; i < len; i++)
@@ -378,7 +358,7 @@ void kernel_main(void)
             continue;
         }
 
-        if (c == 2)  // down arrow
+        if (c == KEY_DOWN)
         {
             const char* hist = history_down();
             for (size_t i = 0; i < len; i++)
@@ -393,6 +373,11 @@ void kernel_main(void)
                 len++;
             }
             line[len] = '\0';
+            continue;
+        }
+
+        if (c >= KEY_UP)
+        {
             continue;
         }
 
@@ -424,9 +409,9 @@ void kernel_main(void)
 
         if (len + 1 < sizeof(line))
         {
-            line[len++] = c;
+            line[len++] = (char)c;
             line[len] = '\0';
-            console_putc(c);
+            console_putc((char)c);
         }
     }
 }

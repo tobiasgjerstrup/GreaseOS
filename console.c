@@ -73,6 +73,72 @@ void console_write(const char* msg)
     }
 }
 
+void console_putc_at(uint16_t row, uint16_t col, char c)
+{
+    if (row >= VGA_HEIGHT || col >= VGA_WIDTH)
+    {
+        return;
+    }
+    VGA[row * VGA_WIDTH + col] = (uint16_t)vga_color << 8 | (uint8_t)c;
+}
+
+void console_write_at(uint16_t row, uint16_t col, const char* msg)
+{
+    uint16_t x = col;
+    for (size_t i = 0; msg[i] != '\0' && x < VGA_WIDTH; ++i, ++x)
+    {
+        console_putc_at(row, x, msg[i]);
+    }
+}
+
+void console_clear_line(uint16_t row)
+{
+    if (row >= VGA_HEIGHT)
+    {
+        return;
+    }
+    for (uint16_t x = 0; x < VGA_WIDTH; ++x)
+    {
+        VGA[row * VGA_WIDTH + x] = (uint16_t)vga_color << 8 | ' ';
+    }
+}
+
+void console_get_cursor(uint16_t* row, uint16_t* col)
+{
+    if (row)
+    {
+        *row = vga_row;
+    }
+    if (col)
+    {
+        *col = vga_col;
+    }
+}
+
+void console_set_cursor(uint16_t row, uint16_t col)
+{
+    if (row < VGA_HEIGHT)
+    {
+        vga_row = row;
+    }
+    if (col < VGA_WIDTH)
+    {
+        vga_col = col;
+    }
+}
+
+void console_get_dimensions(uint16_t* width, uint16_t* height)
+{
+    if (width)
+    {
+        *width = VGA_WIDTH;
+    }
+    if (height)
+    {
+        *height = VGA_HEIGHT;
+    }
+}
+
 void console_backspace(void)
 {
     if (vga_col == 0 && vga_row == 0)

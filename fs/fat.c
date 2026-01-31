@@ -563,6 +563,35 @@ static void fat_write_dir_entry(uint8_t* entry, const char name[11], uint8_t att
     entry[31] = (uint8_t)((size >> 24) & 0xFF);
 }
 
+static int fat_free_chain(uint16_t cluster)
+{
+    if (cluster < 2)
+    {
+        return 0;
+    }
+
+    uint8_t sector[512];
+    while (cluster >= 2)
+    {
+        uint16_t next = 0;
+        if (fat_read_entry(cluster, &next, sector) != 0)
+        {
+            return -1;
+        }
+        if (fat_write_entry(cluster, 0x0000, sector) != 0)
+        {
+            return -1;
+        }
+        if (fat_is_eoc(next))
+        {
+            break;
+        }
+        cluster = next;
+    }
+
+    return 0;
+}
+
 int fat_init(void)
 {
     uint8_t sector[512];
@@ -1028,6 +1057,87 @@ int fat_cat(const char* name)
     return 0;
 }
 
+int fat_read(const char* name, char* out, size_t max, size_t* out_size)
+{
+    if (out_size)
+    {
+        *out_size = 0;
+    }
+
+    uint8_t entry[32];
+    uint32_t lba = 0;
+    uint32_t offset = 0;
+    if (fat_find_entry_in_dir(g_fs.current_dir_cluster, name, entry, &lba, &offset) != 0)
+    {
+        set_error("Not found");
+        return -1;
+    }
+
+    if (entry[11] & FAT_ATTR_DIRECTORY)
+    {
+        set_error("Is a directory");
+        return -1;
+    }
+
+    uint32_t size = le32(&entry[28]);
+    uint16_t cluster = (uint16_t)entry[26] | ((uint16_t)entry[27] << 8);
+
+    if (size == 0 || cluster == 0)
+    {
+        if (out && max > 0)
+        {
+            out[0] = '\0';
+        }
+        if (out_size)
+        {
+            *out_size = 0;
+        }
+        return 0;
+    }
+
+    if (size + 1 > max)
+    {
+        set_error("Buffer too small");
+        return -1;
+    }
+
+    uint8_t sector[512];
+    uint32_t remaining = size;
+    size_t written = 0;
+
+    while (cluster >= 2 && !fat_is_eoc(cluster) && remaining > 0)
+    {
+        uint32_t base = fat_cluster_to_lba(cluster);
+        for (uint8_t s = 0; s < g_fs.sectors_per_cluster && remaining > 0; ++s)
+        {
+            if (fat_read_sector(base + s, sector) != 0)
+            {
+                return -1;
+            }
+            for (uint32_t i = 0; i < g_fs.bytes_per_sector && remaining > 0; ++i)
+            {
+                out[written++] = (char)sector[i];
+                remaining--;
+            }
+        }
+
+        uint8_t fat_sector[512];
+        uint16_t next = 0;
+        if (fat_read_entry(cluster, &next, fat_sector) != 0)
+        {
+            return -1;
+        }
+        cluster = next;
+    }
+
+    out[written] = '\0';
+    if (out_size)
+    {
+        *out_size = written;
+    }
+    return 0;
+}
+
 int fat_df(void)
 {
     uint32_t entries_per_sector = g_fs.bytes_per_sector / 2;
@@ -1081,7 +1191,7 @@ int fat_df(void)
     return 0;
 }
 
-int fat_write(const char* name, const char* data)
+int fat_write_data(const char* name, const char* data, size_t data_len)
 {
     if (name == 0 || name[0] == '\0')
     {
@@ -1091,14 +1201,6 @@ int fat_write(const char* name, const char* data)
     if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0')))
     {
         set_error("Invalid name");
-        return -1;
-    }
-
-    size_t data_len = str_len(data);
-    uint32_t max_size = (uint32_t)g_fs.bytes_per_sector * g_fs.sectors_per_cluster;
-    if (data_len > max_size)
-    {
-        set_error("Write too large");
         return -1;
     }
 
@@ -1118,18 +1220,62 @@ int fat_write(const char* name, const char* data)
         cluster = (uint16_t)entry[26] | ((uint16_t)entry[27] << 8);
     }
 
-    if (cluster == 0)
+    if (cluster != 0)
     {
-        uint8_t fat_sector[512];
-        if (fat_find_free_cluster(&cluster, fat_sector) != 0)
+        if (fat_free_chain(cluster) != 0)
         {
             return -1;
         }
-        if (fat_write_entry(cluster, 0xFFFF, fat_sector) != 0)
+        cluster = 0;
+    }
+
+    uint32_t cluster_size = (uint32_t)g_fs.bytes_per_sector * g_fs.sectors_per_cluster;
+    uint32_t clusters_needed = 0;
+    if (data_len > 0)
+    {
+        clusters_needed = (data_len + cluster_size - 1) / cluster_size;
+    }
+
+    uint16_t first_cluster = 0;
+    uint16_t prev_cluster = 0;
+    for (uint32_t i = 0; i < clusters_needed; ++i)
+    {
+        uint8_t fat_sector[512];
+        uint16_t new_cluster = 0;
+        if (fat_find_free_cluster(&new_cluster, fat_sector) != 0)
         {
+            if (first_cluster != 0)
+            {
+                fat_free_chain(first_cluster);
+            }
+            return -1;
+        }
+        if (prev_cluster != 0)
+        {
+            if (fat_write_entry(prev_cluster, new_cluster, fat_sector) != 0)
+            {
+                fat_free_chain(first_cluster);
+                return -1;
+            }
+        }
+        prev_cluster = new_cluster;
+        if (first_cluster == 0)
+        {
+            first_cluster = new_cluster;
+        }
+    }
+
+    if (prev_cluster != 0)
+    {
+        uint8_t fat_sector[512];
+        if (fat_write_entry(prev_cluster, 0xFFFF, fat_sector) != 0)
+        {
+            fat_free_chain(first_cluster);
             return -1;
         }
     }
+
+    cluster = first_cluster;
 
     if (!exists)
     {
@@ -1171,34 +1317,47 @@ int fat_write(const char* name, const char* data)
         }
     }
 
-    uint32_t base = fat_cluster_to_lba(cluster);
-    size_t written = 0;
-    for (uint8_t s = 0; s < g_fs.sectors_per_cluster; ++s)
+    if (data_len == 0)
     {
-        uint8_t sector[512];
-        mem_set(sector, 0, sizeof(sector));
-        for (uint32_t i = 0; i < g_fs.bytes_per_sector && written < data_len; ++i)
+        return 0;
+    }
+
+    size_t written = 0;
+    while (cluster >= 2 && !fat_is_eoc(cluster) && written < data_len)
+    {
+        uint32_t base = fat_cluster_to_lba(cluster);
+        for (uint8_t s = 0; s < g_fs.sectors_per_cluster; ++s)
         {
-            sector[i] = (uint8_t)data[written++];
+            uint8_t sector[512];
+            mem_set(sector, 0, sizeof(sector));
+            for (uint32_t i = 0; i < g_fs.bytes_per_sector && written < data_len; ++i)
+            {
+                sector[i] = (uint8_t)data[written++];
+            }
+            if (fat_write_sector(base + s, sector) != 0)
+            {
+                return -1;
+            }
         }
-        if (fat_write_sector(base + s, sector) != 0)
+
+        if (written >= data_len)
+        {
+            break;
+        }
+
+        uint8_t fat_sector[512];
+        uint16_t next = 0;
+        if (fat_read_entry(cluster, &next, fat_sector) != 0)
         {
             return -1;
         }
-        if (written >= data_len)
-        {
-            for (uint8_t rest = (uint8_t)(s + 1); rest < g_fs.sectors_per_cluster; ++rest)
-            {
-                uint8_t zero[512];
-                mem_set(zero, 0, sizeof(zero));
-                if (fat_write_sector(base + rest, zero) != 0)
-                {
-                    return -1;
-                }
-            }
-            break;
-        }
+        cluster = next;
     }
 
     return 0;
+}
+
+int fat_write(const char* name, const char* data)
+{
+    return fat_write_data(name, data, str_len(data));
 }

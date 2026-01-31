@@ -16,7 +16,7 @@ NASMFLAGS := -f elf32
 CFLAGS := -m32 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra -I.
 LDFLAGS := -m elf_i386 -T linker.ld -nostdlib
 
-C_SOURCES := kernel.c console.c drivers/ata.c fs/fat.c
+C_SOURCES := kernel.c console.c keyboard.c editor.c drivers/ata.c fs/fat.c
 C_OBJS := $(C_SOURCES:%.c=$(BUILD_DIR)/%.o)
 
 build: $(ISO)
