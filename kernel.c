@@ -7,6 +7,7 @@
 #include "keyboard.h"
 #include "editor.h"
 #include "hwinfo.h"
+#include "exec.h"
 
 static const char *skip_spaces(const char *s)
 {
@@ -129,7 +130,7 @@ static void execute_command(const char *line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, touch, cat, write, v, df, shutdown, restart\n");
+        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, touch, cat, write, v, exec, df, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
@@ -293,6 +294,17 @@ static void execute_command(const char *line)
         {
             console_write("Editor error\n");
         }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "exec"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: exec <file>\n");
+            return;
+        }
+        exec_run(arg);
         return;
     }
 

@@ -40,7 +40,34 @@ make clean          # Clean build files
 - Use a Gen1 VM (legacy BIOS) with an IDE-attached data disk.
 - The kernel expects a raw FAT16 disk image like build/disk.img. If you use Hyper-V, convert that image to a fixed VHD/VHDX and attach it as an IDE disk (IDE 0:1 is typical).
 - If you attach a blank VHD/VHDX, you will see “FAT init failed: No boot sector”.
+### Shell Commands
+- `help` - List available commands
+- `ls`, `cd`, `pwd`, `mkdir`, `touch` - File system operations
+- `cat <file>`, `write <file> <text>` - Read/write files
+- `v <file>` - Open text editor
+- `exec <file>` - Execute flat binary program
+- `hw` - Show hardware information
+- `df` - Show disk usage
+- `clear` - Clear screen
+- `shutdown`, `restart` - Power control
 
+### Running Programs
+See [examples/README.md](examples/README.md) for how to write and compile user programs.
+
+Quick example:
+```bash
+# Compile example program
+nasm -f bin examples/hello.asm -o hello.bin
+
+# Mount disk and copy binary
+sudo mount -o loop build/disk.img /tmp/disk
+sudo cp hello.bin /tmp/disk/
+sudo umount /tmp/disk
+
+# Run in OS
+make run
+# In OS shell: exec hello.bin
+```
 ### Files
 - `entry.asm` - Multiboot entry stub (32-bit)
 - `entry64.asm` - Multiboot2 entry stub with long mode setup (64-bit)
@@ -49,6 +76,7 @@ make clean          # Clean build files
 - `keyboard.c` - Keyboard input with arrow keys and Ctrl support
 - `editor.c` - Full-screen text editor (`v` command)
 - `hwinfo.c` - Hardware information display (`hw` command)
+- `exec.c` - Binary execution engine with syscall interface
 - `drivers/ata.c` - ATA PIO disk I/O
 - `fs/fat.c` - FAT16 filesystem with multi-cluster support
 - `linker.ld` - Kernel linker script (32-bit)
