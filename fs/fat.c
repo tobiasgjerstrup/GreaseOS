@@ -1361,3 +1361,146 @@ int fat_write(const char* name, const char* data)
 {
     return fat_write_data(name, data, str_len(data));
 }
+
+int fat_rm(const char* name)
+{
+    if (name == 0 || name[0] == '\0')
+    {
+        set_error("Invalid name");
+        return -1;
+    }
+    if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0')))
+    {
+        set_error("Cannot remove . or ..");
+        return -1;
+    }
+
+    uint8_t entry[32];
+    uint32_t lba = 0;
+    uint32_t offset = 0;
+    if (fat_find_entry_in_dir(g_fs.current_dir_cluster, name, entry, &lba, &offset) != 0)
+    {
+        set_error("Not found");
+        return -1;
+    }
+
+    if (entry[11] & FAT_ATTR_DIRECTORY)
+    {
+        set_error("Is a directory");
+        return -1;
+    }
+
+    uint16_t cluster = (uint16_t)entry[26] | ((uint16_t)entry[27] << 8);
+
+    if (cluster != 0)
+    {
+        if (fat_free_chain(cluster) != 0)
+        {
+            return -1;
+        }
+    }
+
+    uint8_t sector[512];
+    if (fat_read_sector(lba, sector) != 0)
+    {
+        return -1;
+    }
+
+    sector[offset] = 0xE5;
+    if (fat_write_sector(lba, sector) != 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+int fat_rmdir(const char* name)
+{
+    if (name == 0 || name[0] == '\0')
+    {
+        set_error("Invalid name");
+        return -1;
+    }
+    if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0')))
+    {
+        set_error("Cannot remove . or ..");
+        return -1;
+    }
+
+    uint8_t entry[32];
+    uint32_t lba = 0;
+    uint32_t offset = 0;
+    if (fat_find_entry_in_dir(g_fs.current_dir_cluster, name, entry, &lba, &offset) != 0)
+    {
+        set_error("Not found");
+        return -1;
+    }
+
+    if ((entry[11] & FAT_ATTR_DIRECTORY) == 0)
+    {
+        set_error("Not a directory");
+        return -1;
+    }
+
+    uint16_t cluster = (uint16_t)entry[26] | ((uint16_t)entry[27] << 8);
+
+    if (cluster < 2)
+    {
+        set_error("Invalid directory");
+        return -1;
+    }
+
+    uint8_t sector[512];
+    uint32_t base = fat_cluster_to_lba(cluster);
+
+    if (fat_read_sector(base, sector) != 0)
+    {
+        return -1;
+    }
+
+    int empty = 1;
+    for (uint32_t i = 64; i < g_fs.bytes_per_sector; i += 32)
+    {
+        uint8_t first = sector[i];
+        if (first == 0x00)
+        {
+            break;
+        }
+        if (first == 0xE5)
+        {
+            continue;
+        }
+        uint8_t attr = sector[i + 11];
+        if (attr == FAT_ATTR_LFN || attr == FAT_ATTR_VOLUME_ID)
+        {
+            continue;
+        }
+        empty = 0;
+        break;
+    }
+
+    if (!empty)
+    {
+        set_error("Directory not empty");
+        return -1;
+    }
+
+    if (fat_free_chain(cluster) != 0)
+    {
+        return -1;
+    }
+
+    if (fat_read_sector(lba, sector) != 0)
+    {
+        return -1;
+    }
+
+    sector[offset] = 0xE5;
+    if (fat_write_sector(lba, sector) != 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}

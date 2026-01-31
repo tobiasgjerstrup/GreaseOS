@@ -131,7 +131,7 @@ static void execute_command(const char *line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, touch, cat, write, v, exec, ss, df, snake, shutdown, restart\n");
+        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, rmdir, touch, cat, write, rm, v, exec, ss, df, snake, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
@@ -212,6 +212,21 @@ static void execute_command(const char *line)
         return;
     }
 
+    if (cmd_is(cmd, cmd_len, "rmdir"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: rmdir <name>\n");
+            return;
+        }
+        if (fat_rmdir(arg) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
     if (cmd_is(cmd, cmd_len, "touch"))
     {
         if (*arg == '\0')
@@ -235,6 +250,21 @@ static void execute_command(const char *line)
             return;
         }
         if (fat_cat(arg) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "rm"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: rm <name>\n");
+            return;
+        }
+        if (fat_rm(arg) != 0)
         {
             console_write(fat_last_error());
             console_putc('\n');

@@ -15,3 +15,5 @@ int fat_write_data(const char* name, const char* data, size_t data_len);
 int fat_read(const char* name, char* out, size_t max, size_t* out_size);
 const char* fat_last_error(void);
 int fat_df(void);
+int fat_rm(const char* name);
+int fat_rmdir(const char* name);
