@@ -23,7 +23,7 @@ CFLAGS_64 := -m64 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall
 LDFLAGS_32 := -m elf_i386 -T linker.ld -nostdlib
 LDFLAGS_64 := -m elf_x86_64 -T linker64.ld -nostdlib
 
-C_SOURCES := kernel.c console.c keyboard.c editor.c hwinfo.c exec.c snake.c drivers/ata.c fs/fat.c
+C_SOURCES := kernel.c console.c keyboard.c editor.c hwinfo.c exec.c snake.c clipboard.c drivers/ata.c fs/fat.c
 C_OBJS_32 := $(C_SOURCES:%.c=$(BUILD_DIR)/32/%.o)
 C_OBJS_64 := $(C_SOURCES:%.c=$(BUILD_DIR)/64/%.o)
 

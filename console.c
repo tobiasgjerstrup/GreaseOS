@@ -158,3 +158,38 @@ void console_backspace(void)
 
     VGA[vga_row * VGA_WIDTH + vga_col] = (uint16_t)vga_color << 8 | ' ';
 }
+
+char console_get_char_at(uint16_t row, uint16_t col)
+{
+    if (row >= VGA_HEIGHT || col >= VGA_WIDTH)
+    {
+        return ' ';
+    }
+    uint16_t data = VGA[row * VGA_WIDTH + col];
+    return (char)(data & 0xFF);
+}
+
+char* console_get_line(uint16_t row, char* buf, size_t max_len)
+{
+    if (row >= VGA_HEIGHT || buf == 0 || max_len == 0)
+    {
+        if (buf && max_len > 0)
+        {
+            buf[0] = '\0';
+        }
+        return buf;
+    }
+
+    size_t i = 0;
+    for (uint16_t col = 0; col < VGA_WIDTH && i + 1 < max_len; col++)
+    {
+        char ch = console_get_char_at(row, col);
+        if (ch == ' ')
+        {
+            break;
+        }
+        buf[i++] = ch;
+    }
+    buf[i] = '\0';
+    return buf;
+}

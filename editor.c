@@ -5,6 +5,7 @@
 #include "editor.h"
 #include "fs/fat.h"
 #include "keyboard.h"
+#include "clipboard.h"
 
 #define EDITOR_MAX_SIZE 16384
 #define STATUS_MSG_MAX 64
@@ -411,6 +412,53 @@ static int editor_load(const char* filename)
     return 0;
 }
 
+static void editor_copy(void)
+{
+    if (g_len > 0)
+    {
+        g_buffer[g_len] = '\0';
+        clipboard_copy(g_buffer);
+        editor_set_status("Copied to clipboard");
+    }
+    else
+    {
+        editor_set_status("Nothing to copy");
+    }
+}
+
+static void editor_paste(void)
+{
+    const char* clipboard_data = clipboard_paste();
+    if (clipboard_data[0] == '\0')
+    {
+        editor_set_status("Clipboard empty");
+        return;
+    }
+
+    size_t i = 0;
+    while (clipboard_data[i] != '\0')
+    {
+        if (g_len + 1 >= EDITOR_MAX_SIZE)
+        {
+            editor_set_status("Buffer full");
+            break;
+        }
+        
+        char c = clipboard_data[i];
+        mem_move(&g_buffer[g_cursor + 1], &g_buffer[g_cursor], g_len - g_cursor);
+        g_buffer[g_cursor] = c;
+        g_cursor++;
+        g_len++;
+        g_buffer[g_len] = '\0';
+        
+        i++;
+    }
+    
+    g_dirty = 1;
+    g_quit_confirm = 0;
+    editor_set_status("Pasted");
+}
+
 int editor_run(const char* filename)
 {
     str_copy(g_filename, sizeof(g_filename), filename);
@@ -469,6 +517,14 @@ int editor_run(const char* filename)
         else if (key == 0x13)
         {
             editor_save();
+        }
+        else if (key == KEY_CTRL_C)
+        {
+            editor_copy();
+        }
+        else if (key == KEY_CTRL_V)
+        {
+            editor_paste();
         }
         else if (key == 0x11)
         {

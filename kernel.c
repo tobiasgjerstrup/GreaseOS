@@ -9,6 +9,7 @@
 #include "hwinfo.h"
 #include "exec.h"
 #include "snake.h"
+#include "clipboard.h"
 
 static const char *skip_spaces(const char *s)
 {
@@ -131,8 +132,9 @@ static void execute_command(const char *line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, rmdir, touch, cat, write, rm, cp, v, exec, ss, df, snake, shutdown, restart\n");
+        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, rmdir, touch, cat, write, rm, cp, paste, v, exec, ss, df, snake, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
+        console_write("Use Ctrl+V to paste clipboard content.\n");
         return;
     }
 
@@ -330,6 +332,21 @@ static void execute_command(const char *line)
         return;
     }
 
+    if (cmd_is(cmd, cmd_len, "paste"))
+    {
+        const char *content = clipboard_paste();
+        if (content[0] == '\0')
+        {
+            console_write("Clipboard is empty.\n");
+        }
+        else
+        {
+            console_write(content);
+            console_putc('\n');
+        }
+        return;
+    }
+
     if (cmd_is(cmd, cmd_len, "v"))
     {
         if (*arg == '\0')
@@ -499,6 +516,8 @@ void kernel_main(void)
 #endif
     print_prompt();
 
+    clipboard_init();
+
     char line[128];
     size_t len = 0;
 
@@ -512,6 +531,36 @@ void kernel_main(void)
         int c = keyboard_read_key();
         if (c == 0)
         {
+            continue;
+        }
+
+        if (c == KEY_CTRL_V)
+        {
+            const char *paste = clipboard_paste();
+            size_t paste_len = 0;
+            while (paste[paste_len] != '\0' && paste[paste_len] != '\n')
+            {
+                paste_len++;
+            }
+
+            size_t i = 0;
+            while (i < paste_len && len + 1 < sizeof(line))
+            {
+                line[len++] = paste[i];
+                console_putc(paste[i]);
+                i++;
+            }
+            line[len] = '\0';
+            continue;
+        }
+
+        if (c == KEY_CTRL_C)
+        {
+            if (len > 0)
+            {
+                line[len] = '\0';
+                clipboard_copy(line);
+            }
             continue;
         }
 
