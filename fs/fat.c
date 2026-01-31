@@ -1504,3 +1504,38 @@ int fat_rmdir(const char* name)
 
     return 0;
 }
+
+int fat_cp(const char* src, const char* dst)
+{
+    if (src == 0 || src[0] == '\0' || dst == 0 || dst[0] == '\0')
+    {
+        set_error("Invalid name");
+        return -1;
+    }
+
+    if (src[0] == '.' && (src[1] == '\0' || (src[1] == '.' && src[2] == '\0')))
+    {
+        set_error("Cannot copy . or ..");
+        return -1;
+    }
+
+    if (dst[0] == '.' && (dst[1] == '\0' || (dst[1] == '.' && dst[2] == '\0')))
+    {
+        set_error("Invalid destination");
+        return -1;
+    }
+
+    char buffer[4096];
+    size_t file_size = 0;
+    if (fat_read(src, buffer, sizeof(buffer) - 1, &file_size) != 0)
+    {
+        return -1;
+    }
+
+    if (fat_write_data(dst, buffer, file_size) != 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}

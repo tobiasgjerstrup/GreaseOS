@@ -17,3 +17,4 @@ const char* fat_last_error(void);
 int fat_df(void);
 int fat_rm(const char* name);
 int fat_rmdir(const char* name);
+int fat_cp(const char* src, const char* dst);

@@ -131,7 +131,7 @@ static void execute_command(const char *line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, rmdir, touch, cat, write, rm, v, exec, ss, df, snake, shutdown, restart\n");
+        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, rmdir, touch, cat, write, rm, cp, v, exec, ss, df, snake, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
@@ -265,6 +265,35 @@ static void execute_command(const char *line)
             return;
         }
         if (fat_rm(arg) != 0)
+        {
+            console_write(fat_last_error());
+            console_putc('\n');
+        }
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "cp"))
+    {
+        if (*arg == '\0')
+        {
+            console_write("Usage: cp <src> <dst>\n");
+            return;
+        }
+        char src[13];
+        size_t i = 0;
+        while (arg[i] != '\0' && arg[i] != ' ' && i + 1 < sizeof(src))
+        {
+            src[i] = arg[i];
+            i++;
+        }
+        src[i] = '\0';
+        const char *dst = skip_spaces(arg + i);
+        if (src[0] == '\0' || dst[0] == '\0')
+        {
+            console_write("Usage: cp <src> <dst>\n");
+            return;
+        }
+        if (fat_cp(src, dst) != 0)
         {
             console_write(fat_last_error());
             console_putc('\n');
