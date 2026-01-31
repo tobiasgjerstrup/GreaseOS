@@ -6,6 +6,7 @@
 #include "io.h"
 #include "keyboard.h"
 #include "editor.h"
+#include "hwinfo.h"
 
 static const char* skip_spaces(const char* s)
 {
@@ -128,7 +129,7 @@ static void execute_command(const char* line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, ls, cd, pwd, mkdir, touch, cat, write, v, df, shutdown, restart\n");
+        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, touch, cat, write, v, df, shutdown, restart\n");
         console_write("Use UP/DOWN arrow keys to navigate command history.\n");
         return;
     }
@@ -149,6 +150,12 @@ static void execute_command(const char* line)
     if (cmd_is(cmd, cmd_len, "info"))
     {
         console_write("x86 kernel (32-bit, C, VGA)\n");
+        return;
+    }
+
+    if (cmd_is(cmd, cmd_len, "hw"))
+    {
+        hwinfo_display();
         return;
     }
 
