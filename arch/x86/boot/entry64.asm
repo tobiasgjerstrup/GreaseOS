@@ -25,6 +25,9 @@ p2_table:
 stack_bottom:
     resb 16384
 stack_top:
+align 16
+idt64:
+    resb 4096
 
 section .text
 bits 32
@@ -32,6 +35,7 @@ global start
 extern kernel_main
 
 start:
+    cli
     mov esp, stack_top
 
     ; Check for CPUID
@@ -118,20 +122,55 @@ section .rodata
 gdt64:
     dq 0
 .code: equ $ - gdt64
-    dq (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)
+    dq 0x00AF9A000000FFFF
+.data: equ $ - gdt64
+    dq 0x00AF92000000FFFF
 .pointer:
     dw $ - gdt64 - 1
     dq gdt64
+align 8
+idt64_ptr:
+    dw 4096 - 1
+    dq idt64
 
 section .text
 bits 64
+isr_stub:
+    cli
+.halt:
+    hlt
+    jmp .halt
+
 long_mode_start:
-    mov ax, 0
+    mov ax, gdt64.data
     mov ss, ax
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
+
+    mov rsp, stack_top
+
+    lea rdi, [idt64]
+    mov rcx, 256
+    mov rax, isr_stub
+    mov rbx, rax
+    shr rbx, 16
+    mov dx, bx
+    mov r8, rax
+    shr r8, 32
+.idt_fill:
+    mov word [rdi + 0], ax
+    mov word [rdi + 2], gdt64.code
+    mov byte [rdi + 4], 0
+    mov byte [rdi + 5], 0x8E
+    mov word [rdi + 6], dx
+    mov dword [rdi + 8], r8d
+    mov dword [rdi + 12], 0
+    add rdi, 16
+    loop .idt_fill
+
+    lidt [idt64_ptr]
 
     call kernel_main
 

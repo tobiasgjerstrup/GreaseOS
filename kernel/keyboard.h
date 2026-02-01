@@ -17,3 +17,6 @@ enum
 
 int keyboard_has_data(void);
 int keyboard_read_key(void);
+void keyboard_init(void);
+uint8_t keyboard_last_scancode(void);
+uint8_t keyboard_last_status(void);

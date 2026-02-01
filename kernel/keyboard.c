@@ -12,15 +12,69 @@ static const char scancode_map[128] = {
 
 static uint8_t g_extended_scancode = 0;
 static uint8_t g_ctrl_down = 0;
+static uint8_t g_last_scancode = 0;
+static uint8_t g_last_status = 0;
+
+static void keyboard_wait_write(void)
+{
+    while (inb(0x64) & 0x02)
+    {
+    }
+}
+
+static void keyboard_wait_read(void)
+{
+    while ((inb(0x64) & 0x01) == 0)
+    {
+    }
+}
+
+void keyboard_init(void)
+{
+    while (inb(0x64) & 0x01)
+    {
+        (void)inb(0x60);
+    }
+
+    keyboard_wait_write();
+    outb(0x64, 0xAD);
+    keyboard_wait_write();
+    outb(0x64, 0xA7);
+
+    keyboard_wait_write();
+    outb(0x64, 0x20);
+    keyboard_wait_read();
+    uint8_t config = inb(0x60);
+    config |= 0x01;
+    config &= ~(1 << 4);
+    config &= ~(1 << 5);
+    config |= (1 << 6);
+
+    keyboard_wait_write();
+    outb(0x64, 0x60);
+    keyboard_wait_write();
+    outb(0x60, config);
+
+    keyboard_wait_write();
+    outb(0x64, 0xAE);
+
+    keyboard_wait_write();
+    outb(0x60, 0xF4);
+
+    keyboard_wait_read();
+    (void)inb(0x60);
+}
 
 int keyboard_has_data(void)
 {
-    return (inb(0x64) & 0x01) != 0;
+    g_last_status = inb(0x64);
+    return (g_last_status & 0x01) != 0;
 }
 
 int keyboard_read_key(void)
 {
     uint8_t scancode = inb(0x60);
+    g_last_scancode = scancode;
 
     if (scancode == 0xE0)
     {
@@ -81,4 +135,14 @@ int keyboard_read_key(void)
     }
 
     return 0;
+}
+
+uint8_t keyboard_last_scancode(void)
+{
+    return g_last_scancode;
+}
+
+uint8_t keyboard_last_status(void)
+{
+    return g_last_status;
 }

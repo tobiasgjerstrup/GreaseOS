@@ -87,6 +87,32 @@ static void print_prompt(void)
     console_write("> ");
 }
 
+static void debug_show_scancode(uint8_t sc)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    char buf[6];
+    buf[0] = 'S';
+    buf[1] = 'C';
+    buf[2] = ':';
+    buf[3] = hex[(sc >> 4) & 0xF];
+    buf[4] = hex[sc & 0xF];
+    buf[5] = '\0';
+    console_write_at(24, 75, buf);
+}
+
+static void debug_show_status(uint8_t st)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    char buf[6];
+    buf[0] = 'S';
+    buf[1] = 'T';
+    buf[2] = ':';
+    buf[3] = hex[(st >> 4) & 0xF];
+    buf[4] = hex[st & 0xF];
+    buf[5] = '\0';
+    console_write_at(24, 68, buf);
+}
+
 static void shutdown(void)
 {
     outw(0x604, 0x2000);
@@ -518,20 +544,27 @@ void kernel_main(void)
     console_write("x86 kernel (32-bit, C, VGA)\n");
 #endif
     print_prompt();
-
-    clipboard_init();
+    console_putc('A');
+    console_putc('B');
+    console_putc('.');
+    console_putc('.');
+    console_putc('.');
+    console_putc('C');
 
     char line[128];
     size_t len = 0;
 
     for (;;)
     {
-        if (!keyboard_has_data())
+        int has_data = keyboard_has_data();
+        debug_show_status(keyboard_last_status());
+        if (!has_data)
         {
             continue;
         }
 
         int c = keyboard_read_key();
+        debug_show_scancode(keyboard_last_scancode());
         if (c == 0)
         {
             continue;
