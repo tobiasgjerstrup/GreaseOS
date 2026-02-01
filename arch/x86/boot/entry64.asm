@@ -24,6 +24,7 @@ p2_table:
     resb 4096
 stack_bottom:
     resb 16384
+align 16
 stack_top:
 align 16
 idt64:
@@ -150,6 +151,8 @@ long_mode_start:
     mov gs, ax
 
     mov rsp, stack_top
+    and rsp, 0xFFFFFFFFFFFFFFF0
+    sub rsp, 8
 
     lea rdi, [idt64]
     mov rcx, 256

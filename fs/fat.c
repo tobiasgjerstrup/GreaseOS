@@ -884,6 +884,8 @@ const char* fat_pwd(void)
 
 int fat_mkdir(const char* name)
 {
+    static uint8_t temp_sector[512];
+    
     if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0')))
     {
         set_error("Invalid name");
@@ -928,34 +930,20 @@ int fat_mkdir(const char* name)
         return -1;
     }
 
-    uint8_t dir_sector[512];
-    mem_set(dir_sector, 0, sizeof(dir_sector));
-
-    char dot[11];
-    mem_set((uint8_t*)dot, ' ', 11);
-    dot[0] = '.';
-    fat_write_dir_entry(dir_sector, dot, FAT_ATTR_DIRECTORY, new_cluster, 0);
-
-    char dotdot[11];
-    mem_set((uint8_t*)dotdot, ' ', 11);
-    dotdot[0] = '.';
-    dotdot[1] = '.';
-    fat_write_dir_entry(&dir_sector[32], dotdot, FAT_ATTR_DIRECTORY, g_fs.current_dir_cluster, 0);
-
     uint32_t base = fat_cluster_to_lba(new_cluster);
-    if (fat_write_sector(base, dir_sector) != 0)
+    
+    mem_set((uint8_t*)fat_name, ' ', 11);
+    fat_name[0] = '.';
+    fat_write_dir_entry(temp_sector, fat_name, FAT_ATTR_DIRECTORY, new_cluster, 0);
+
+    mem_set((uint8_t*)entry, ' ', 11);
+    entry[0] = '.';
+    entry[1] = '.';
+    fat_write_dir_entry(&temp_sector[32], (const char*)entry, FAT_ATTR_DIRECTORY, g_fs.current_dir_cluster, 0);
+
+    if (fat_write_sector(base, temp_sector) != 0)
     {
         return -1;
-    }
-
-    for (uint8_t s = 1; s < g_fs.sectors_per_cluster; ++s)
-    {
-        uint8_t zero[512];
-        mem_set(zero, 0, sizeof(zero));
-        if (fat_write_sector(base + s, zero) != 0)
-        {
-            return -1;
-        }
     }
 
     return 0;

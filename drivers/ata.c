@@ -21,12 +21,14 @@
 
 static int ata_wait_busy(void)
 {
-    for (uint32_t i = 0; i < 100000; ++i)
+    for (uint32_t i = 0; i < 1000000; ++i)
     {
-        if ((inb(ATA_STATUS) & ATA_SR_BSY) == 0)
+        uint8_t st = inb(ATA_STATUS);
+        if ((st & ATA_SR_BSY) == 0)
         {
             return 0;
         }
+        io_wait();
     }
     return -1;
 }
@@ -44,6 +46,7 @@ static int ata_wait_drq(void)
         {
             return 0;
         }
+        io_wait();
     }
     return -1;
 }
@@ -113,16 +116,16 @@ int ata_write_sector(uint32_t lba, const uint8_t* buffer)
     }
 
     ata_select_drive(lba);
+    io_wait();
+    io_wait();
+    io_wait();
     outb(ATA_SECCOUNT0, 1);
     outb(ATA_LBA0, (uint8_t)(lba & 0xFF));
     outb(ATA_LBA1, (uint8_t)((lba >> 8) & 0xFF));
     outb(ATA_LBA2, (uint8_t)((lba >> 16) & 0xFF));
+    io_wait();
     outb(ATA_COMMAND, ATA_CMD_WRITE);
-
-    if (ata_wait_busy() != 0 || ata_wait_drq() != 0)
-    {
-        return -1;
-    }
+    io_wait();
 
     for (uint32_t i = 0; i < 256; ++i)
     {
@@ -130,7 +133,6 @@ int ata_write_sector(uint32_t lba, const uint8_t* buffer)
         outw(ATA_DATA, data);
     }
 
-    outb(ATA_COMMAND, ATA_CMD_FLUSH);
     if (ata_wait_busy() != 0)
     {
         return -1;

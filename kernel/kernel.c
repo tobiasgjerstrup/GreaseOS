@@ -220,10 +220,14 @@ static void execute_command(const char *line)
             console_write("Usage: cd <dir>\n");
             return;
         }
-        if (fat_cd(arg) != 0)
+        int ret = fat_cd(arg);
+        if (ret == 0)
         {
-            console_write(fat_last_error());
-            console_putc('\n');
+            console_write("OK\n");
+        }
+        else
+        {
+            console_write("ERR\n");
         }
         return;
     }
@@ -235,10 +239,14 @@ static void execute_command(const char *line)
             console_write("Usage: mkdir <name>\n");
             return;
         }
-        if (fat_mkdir(arg) != 0)
+        int ret = fat_mkdir(arg);
+        if (ret == 0)
         {
-            console_write(fat_last_error());
-            console_putc('\n');
+            console_write("OK\n");
+        }
+        else
+        {
+            console_write("ERR\n");
         }
         return;
     }
@@ -396,9 +404,14 @@ static void execute_command(const char *line)
             console_write("Usage: v <name>\n");
             return;
         }
-        if (editor_run(name) != 0)
+        int ret = editor_run(name);
+        if (ret == 0)
         {
-            console_write("Editor error\n");
+            console_write("OK\n");
+        }
+        else
+        {
+            console_write("ERR\n");
         }
         return;
     }
@@ -544,12 +557,6 @@ void kernel_main(void)
     console_write("x86 kernel (32-bit, C, VGA)\n");
 #endif
     print_prompt();
-    console_putc('A');
-    console_putc('B');
-    console_putc('.');
-    console_putc('.');
-    console_putc('.');
-    console_putc('C');
 
     char line[128];
     size_t len = 0;
