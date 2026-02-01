@@ -132,8 +132,11 @@ static void execute_command(const char *line)
 
     if (cmd_is(cmd, cmd_len, "help"))
     {
-        console_write("Commands: help, echo, clear, info, hw, ls, cd, pwd, mkdir, rmdir, touch, cat, write, rm, cp, paste, v, exec, ss, df, snake, shutdown, restart\n");
-        console_write("Use UP/DOWN arrow keys to navigate command history.\n");
+        console_write("System: help, clear, info, hw, df, shutdown, restart\n");
+        console_write("Navigation: ls, cd, pwd, mkdir, rmdir\n");
+        console_write("Files: touch, cat, write, rm, cp\n");
+        console_write("Tools: v, paste, exec, ss, snake, echo\n");
+        console_write("\nUse UP/DOWN arrow keys to navigate command history.\n");
         console_write("Use Ctrl+V to paste clipboard content.\n");
         return;
     }
