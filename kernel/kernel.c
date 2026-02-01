@@ -220,14 +220,10 @@ static void execute_command(const char *line)
             console_write("Usage: cd <dir>\n");
             return;
         }
-        int ret = fat_cd(arg);
-        if (ret == 0)
+        if (fat_cd(arg) != 0)
         {
-            console_write("OK\n");
-        }
-        else
-        {
-            console_write("ERR\n");
+            console_write(fat_last_error());
+            console_putc('\n');
         }
         return;
     }
@@ -239,14 +235,10 @@ static void execute_command(const char *line)
             console_write("Usage: mkdir <name>\n");
             return;
         }
-        int ret = fat_mkdir(arg);
-        if (ret == 0)
+        if (fat_mkdir(arg) != 0)
         {
-            console_write("OK\n");
-        }
-        else
-        {
-            console_write("ERR\n");
+            console_write(fat_last_error());
+            console_putc('\n');
         }
         return;
     }
@@ -404,14 +396,9 @@ static void execute_command(const char *line)
             console_write("Usage: v <name>\n");
             return;
         }
-        int ret = editor_run(name);
-        if (ret == 0)
+        if (editor_run(name) != 0)
         {
-            console_write("OK\n");
-        }
-        else
-        {
-            console_write("ERR\n");
+            console_write("Editor error\n");
         }
         return;
     }

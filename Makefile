@@ -19,7 +19,7 @@ VHDX_IMG := $(BUILD_DIR)/disk.vhdx
 NASMFLAGS_32 := -f elf32
 NASMFLAGS_64 := -f elf64
 CFLAGS_32 := -m32 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra -I. -Iinclude -Ikernel
-CFLAGS_64 := -m64 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O2 -Wall -Wextra -I. -Iinclude -Ikernel -mcmodel=large -mno-red-zone
+CFLAGS_64 := -m64 -ffreestanding -fno-pie -no-pie -fno-stack-protector -O0 -Wall -Wextra -I. -Iinclude -Ikernel -mcmodel=large -mno-red-zone
 LDFLAGS_32 := -m elf_i386 -T arch/x86/linker/linker.ld -nostdlib
 LDFLAGS_64 := -m elf_x86_64 -T arch/x86/linker/linker64.ld -nostdlib
 

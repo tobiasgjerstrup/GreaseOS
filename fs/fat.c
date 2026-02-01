@@ -850,8 +850,8 @@ int fat_cd(const char* name)
     size_t len = str_len(g_cwd);
     if (len == 1 && g_cwd[0] == '/')
     {
-        size_t i = 0;
-        while (name[i] != '\0' && i + 2 < sizeof(g_cwd))
+        int i = 0;
+        while (name[i] != '\0' && i + 2 < (int)sizeof(g_cwd))
         {
             g_cwd[1 + i] = name[i];
             g_cwd[2 + i] = '\0';
@@ -865,7 +865,7 @@ int fat_cd(const char* name)
             g_cwd[len++] = '/';
             g_cwd[len] = '\0';
         }
-        size_t i = 0;
+        int i = 0;
         while (name[i] != '\0' && len + i + 1 < sizeof(g_cwd))
         {
             g_cwd[len + i] = name[i];
@@ -1019,13 +1019,13 @@ int fat_cat(const char* name)
     while (cluster >= 2 && !fat_is_eoc(cluster) && remaining > 0)
     {
         uint32_t base = fat_cluster_to_lba(cluster);
-        for (uint8_t s = 0; s < g_fs.sectors_per_cluster && remaining > 0; ++s)
+        for (int s = 0; s < (int)g_fs.sectors_per_cluster && remaining > 0; ++s)
         {
             if (fat_read_sector(base + s, sector) != 0)
             {
                 return -1;
             }
-            for (uint32_t i = 0; i < g_fs.bytes_per_sector && remaining > 0; ++i)
+            for (int i = 0; i < (int)g_fs.bytes_per_sector && remaining > 0; ++i)
             {
                 console_putc((char)sector[i]);
                 remaining--;
@@ -1096,13 +1096,13 @@ int fat_read(const char* name, char* out, size_t max, size_t* out_size)
     while (cluster >= 2 && !fat_is_eoc(cluster) && remaining > 0)
     {
         uint32_t base = fat_cluster_to_lba(cluster);
-        for (uint8_t s = 0; s < g_fs.sectors_per_cluster && remaining > 0; ++s)
+        for (int s = 0; s < (int)g_fs.sectors_per_cluster && remaining > 0; ++s)
         {
             if (fat_read_sector(base + s, sector) != 0)
             {
                 return -1;
             }
-            for (uint32_t i = 0; i < g_fs.bytes_per_sector && remaining > 0; ++i)
+            for (int i = 0; i < (int)g_fs.bytes_per_sector && remaining > 0; ++i)
             {
                 out[written++] = (char)sector[i];
                 remaining--;
@@ -1133,7 +1133,7 @@ int fat_df(void)
     uint32_t free_clusters = 0;
     uint32_t used_clusters = 0;
 
-    for (uint32_t entry = 2; entry < total_entries; ++entry)
+    for (int entry = 2; (uint32_t)entry < total_entries; ++entry)
     {
         uint32_t fat_offset = entry * 2;
         uint32_t fat_sector = g_fs.reserved_sectors + (fat_offset / g_fs.bytes_per_sector);
@@ -1226,7 +1226,7 @@ int fat_write_data(const char* name, const char* data, size_t data_len)
 
     uint16_t first_cluster = 0;
     uint16_t prev_cluster = 0;
-    for (uint32_t i = 0; i < clusters_needed; ++i)
+    for (int i = 0; i < (int)clusters_needed; ++i)
     {
         uint8_t fat_sector[512];
         uint16_t new_cluster = 0;
@@ -1314,11 +1314,11 @@ int fat_write_data(const char* name, const char* data, size_t data_len)
     while (cluster >= 2 && !fat_is_eoc(cluster) && written < data_len)
     {
         uint32_t base = fat_cluster_to_lba(cluster);
-        for (uint8_t s = 0; s < g_fs.sectors_per_cluster; ++s)
+        for (int s = 0; s < (int)g_fs.sectors_per_cluster; ++s)
         {
             uint8_t sector[512];
-            mem_set(sector, 0, sizeof(sector));
-            for (uint32_t i = 0; i < g_fs.bytes_per_sector && written < data_len; ++i)
+            for (int j = 0; j < 512; j++) { sector[j] = 0; }
+            for (int i = 0; i < (int)g_fs.bytes_per_sector && written < data_len; ++i)
             {
                 sector[i] = (uint8_t)data[written++];
             }
