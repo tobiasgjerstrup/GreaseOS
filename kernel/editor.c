@@ -20,6 +20,11 @@ static uint8_t g_quit_confirm = 0;
 static char g_status[STATUS_MSG_MAX];
 static char g_filename[FILENAME_MAX];
 
+static size_t g_last_cursor = 0;
+static uint32_t g_last_scroll_row = 0;
+static uint8_t g_status_updated = 0;
+static uint8_t g_content_changed = 0;
+
 static size_t str_len(const char* s)
 {
     size_t i = 0;
@@ -229,13 +234,11 @@ static void editor_scroll_to_cursor(uint16_t width, uint16_t height)
     }
 }
 
-static void editor_render(void)
+static void editor_render_full(void)
 {
     uint16_t width = 0;
     uint16_t height = 0;
     console_get_dimensions(&width, &height);
-
-    editor_scroll_to_cursor(width, height);
 
     for (uint16_t r = 0; r < height; ++r)
     {
@@ -301,6 +304,89 @@ static void editor_render(void)
     }
 }
 
+static void editor_render(void)
+{
+    uint16_t width = 0;
+    uint16_t height = 0;
+    console_get_dimensions(&width, &height);
+
+    editor_scroll_to_cursor(width, height);
+
+    uint32_t cur_row = 0;
+    uint16_t cur_col = 0;
+    editor_get_visual_pos(g_cursor, width, &cur_row, &cur_col);
+    uint16_t text_height = (uint16_t)(height - 1);
+
+    // Check if scroll changed - if so, redraw everything
+    if (g_scroll_row != g_last_scroll_row || g_content_changed)
+    {
+        editor_render_full();
+        g_last_scroll_row = g_scroll_row;
+        g_last_cursor = g_cursor;
+        g_status_updated = 0;
+        g_content_changed = 0;
+        return;
+    }
+
+    // Handle cursor movement - erase old cursor, draw new one
+    if (g_cursor != g_last_cursor)
+    {
+        // Erase old cursor
+        uint32_t old_row = 0;
+        uint16_t old_col = 0;
+        editor_get_visual_pos(g_last_cursor, width, &old_row, &old_col);
+        if (old_row >= g_scroll_row && old_row < g_scroll_row + text_height)
+        {
+            uint16_t screen_row = (uint16_t)(old_row - g_scroll_row);
+            size_t idx = editor_index_for_visual(old_row, old_col, width);
+            char c = ' ';
+            if (idx < g_len && g_buffer[idx] != '\n')
+            {
+                c = g_buffer[idx];
+            }
+            console_putc_at(screen_row, old_col, c);
+        }
+
+        // Draw new cursor
+        if (cur_row >= g_scroll_row && cur_row < g_scroll_row + text_height)
+        {
+            uint16_t screen_row = (uint16_t)(cur_row - g_scroll_row);
+            console_putc_at(screen_row, cur_col, '_');
+        }
+
+        g_last_cursor = g_cursor;
+    }
+
+    // Update status line if needed
+    char status_line[128];
+    char num_buf[16];
+    str_copy(status_line, sizeof(status_line), "v ");
+    str_copy(status_line + str_len(status_line), sizeof(status_line) - str_len(status_line), g_filename);
+    str_copy(status_line + str_len(status_line), sizeof(status_line) - str_len(status_line), "  ");
+
+    u32_to_str(cur_row + 1, num_buf, sizeof(num_buf));
+    str_copy(status_line + str_len(status_line), sizeof(status_line) - str_len(status_line), "Ln ");
+    str_copy(status_line + str_len(status_line), sizeof(status_line) - str_len(status_line), num_buf);
+    str_copy(status_line + str_len(status_line), sizeof(status_line) - str_len(status_line), " Col ");
+    u32_to_str((uint32_t)cur_col + 1, num_buf, sizeof(num_buf));
+    str_copy(status_line + str_len(status_line), sizeof(status_line) - str_len(status_line), num_buf);
+
+    if (g_dirty)
+    {
+        str_copy(status_line + str_len(status_line), sizeof(status_line) - str_len(status_line), "  *");
+    }
+
+    console_clear_line((uint16_t)(height - 1));
+    console_write_at((uint16_t)(height - 1), 0, status_line);
+
+    if (g_status[0] != '\0')
+    {
+        console_write_at((uint16_t)(height - 1), (uint16_t)(width > 30 ? width - 30 : 0), g_status);
+    }
+    
+    g_status_updated = 0;
+}
+
 static void editor_insert_char(char c)
 {
     if (g_len + 1 >= EDITOR_MAX_SIZE)
@@ -316,6 +402,7 @@ static void editor_insert_char(char c)
     g_buffer[g_len] = '\0';
     g_dirty = 1;
     g_quit_confirm = 0;
+    g_content_changed = 1;
 }
 
 static void editor_backspace(void)
@@ -331,6 +418,7 @@ static void editor_backspace(void)
     g_buffer[g_len] = '\0';
     g_dirty = 1;
     g_quit_confirm = 0;
+    g_content_changed = 1;
 }
 
 static void editor_move_left(void)
@@ -456,6 +544,7 @@ static void editor_paste(void)
     
     g_dirty = 1;
     g_quit_confirm = 0;
+    g_content_changed = 1;
     editor_set_status("Pasted");
 }
 
@@ -463,6 +552,9 @@ int editor_run(const char* filename)
 {
     str_copy(g_filename, sizeof(g_filename), filename);
     g_scroll_row = 0;
+    g_last_scroll_row = 0;
+    g_last_cursor = 0;
+    g_content_changed = 0;
     g_status[0] = '\0';
     g_quit_confirm = 0;
 
