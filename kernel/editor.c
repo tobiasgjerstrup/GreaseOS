@@ -304,6 +304,68 @@ static void editor_render_full(void)
     }
 }
 
+static void editor_render_line_from_cursor(void)
+{
+    uint16_t width = 0;
+    uint16_t height = 0;
+    console_get_dimensions(&width, &height);
+
+    uint32_t cur_row = 0;
+    uint16_t cur_col = 0;
+    editor_get_visual_pos(g_cursor, width, &cur_row, &cur_col);
+    uint16_t text_height = (uint16_t)(height - 1);
+
+    if (cur_row < g_scroll_row || cur_row >= g_scroll_row + text_height)
+    {
+        // Cursor is off-screen, do nothing (scroll should handle this)
+        return;
+    }
+
+    uint16_t screen_row = (uint16_t)(cur_row - g_scroll_row);
+
+    // Find the start of the current line in the buffer
+    size_t line_start = 0;
+    size_t idx = 0;
+    uint32_t row_count = 0;
+    uint16_t col_in_line = 0;
+    
+    while (idx < g_len && row_count < cur_row)
+    {
+        if (g_buffer[idx] == '\n')
+        {
+            row_count++;
+            line_start = idx + 1;
+        }
+        idx++;
+    }
+    
+    // Clear the entire line and redraw it from the start
+    for (uint16_t col = 0; col < width; col++)
+    {
+        console_putc_at(screen_row, col, ' ');
+    }
+
+    // Redraw the current line from its beginning
+    idx = line_start;
+    uint16_t col = 0;
+    uint32_t buf_idx = line_start;
+    
+    while (buf_idx < g_len && col < width)
+    {
+        char c = g_buffer[buf_idx];
+        if (c == '\n')
+        {
+            break;
+        }
+        console_putc_at(screen_row, col, c);
+        col++;
+        buf_idx++;
+    }
+
+    // Draw cursor
+    console_putc_at(screen_row, cur_col, '_');
+}
+
 static void editor_render(void)
 {
     uint16_t width = 0;
@@ -318,7 +380,7 @@ static void editor_render(void)
     uint16_t text_height = (uint16_t)(height - 1);
 
     // Check if scroll changed - if so, redraw everything
-    if (g_scroll_row != g_last_scroll_row || g_content_changed)
+    if (g_scroll_row != g_last_scroll_row)
     {
         editor_render_full();
         g_last_scroll_row = g_scroll_row;
@@ -328,8 +390,28 @@ static void editor_render(void)
         return;
     }
 
-    // Handle cursor movement - erase old cursor, draw new one
-    if (g_cursor != g_last_cursor)
+    // Check if content changed - only redraw from cursor if on same visual row
+    if (g_content_changed)
+    {
+        uint32_t last_visual_row = 0;
+        uint16_t last_visual_col = 0;
+        editor_get_visual_pos(g_last_cursor, width, &last_visual_row, &last_visual_col);
+
+        // If cursor stayed on same visual line, just redraw from there
+        if (cur_row == last_visual_row)
+        {
+            editor_render_line_from_cursor();
+        }
+        else
+        {
+            // Cursor moved to different line, do full redraw
+            editor_render_full();
+        }
+        g_last_cursor = g_cursor;
+        g_content_changed = 0;
+    }
+    // Handle cursor movement only - erase old cursor, draw new one
+    else if (g_cursor != g_last_cursor)
     {
         // Erase old cursor
         uint32_t old_row = 0;
@@ -552,8 +634,8 @@ int editor_run(const char* filename)
 {
     str_copy(g_filename, sizeof(g_filename), filename);
     g_scroll_row = 0;
-    g_last_scroll_row = 0;
-    g_last_cursor = 0;
+    g_last_scroll_row = 0xFFFFFFFFu;  // Force full render on first call
+    g_last_cursor = 0xFFFFFFFFu;      // Force cursor update
     g_content_changed = 0;
     g_status[0] = '\0';
     g_quit_confirm = 0;
