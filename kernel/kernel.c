@@ -543,17 +543,22 @@ void kernel_main(void)
         console_write(fat_last_error());
         console_putc('\n');
     }
-#if defined(__x86_64__) || defined(__amd64__)
-    console_write("x86 kernel (64-bit, C, VGA)\n");
-#else
-    console_write("x86 kernel (32-bit, C, VGA)\n");
-#endif
 
 #if defined(__x86_64__) || defined(__amd64__)
     if (fb_init(mb2_info) == 0)
     {
-        fb_demo();
+        console_use_framebuffer();
+        console_clear();
+        // fb_demo();
+        console_write("Kernel C loaded.\n");
+        console_write("x86 kernel (64-bit, C, Framebuffer)\n");
     }
+    else
+    {
+        console_write("x86 kernel (64-bit, C, VGA)\n");
+    }
+#else
+    console_write("x86 kernel (32-bit, C, VGA)\n");
 #endif
     print_prompt();
 
