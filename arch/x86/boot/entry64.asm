@@ -7,6 +7,15 @@ multiboot2_header_start:
     dd multiboot2_header_end - multiboot2_header_start
     dd -(0xE85250D6 + 0 + (multiboot2_header_end - multiboot2_header_start))
 
+    ; Framebuffer request (no preference)
+align 8
+    dw 5    ; type
+    dw 0    ; flags
+    dd 20   ; size
+    dd 0    ; width
+    dd 0    ; height
+    dd 0    ; depth
+
     ; End tag
 align 8
     dw 0    ; type
@@ -22,6 +31,14 @@ p3_table:
     resb 4096
 p2_table:
     resb 4096
+p2_table_2:
+    resb 4096
+p2_table_3:
+    resb 4096
+p2_table_4:
+    resb 4096
+mb2_info_ptr:
+    resq 1
 stack_bottom:
     resb 16384
 align 16
@@ -38,6 +55,12 @@ extern kernel_main
 start:
     cli
     mov esp, stack_top
+
+    mov dword [mb2_info_ptr], 0
+    cmp eax, 0x36D76289
+    jne .mb2_done
+    mov [mb2_info_ptr], ebx
+.mb2_done:
 
     ; Check for CPUID
     pushfd
@@ -74,6 +97,18 @@ start:
     or eax, 0b11
     mov [p3_table], eax
 
+    mov eax, p2_table_2
+    or eax, 0b11
+    mov [p3_table + 8], eax
+
+    mov eax, p2_table_3
+    or eax, 0b11
+    mov [p3_table + 16], eax
+
+    mov eax, p2_table_4
+    or eax, 0b11
+    mov [p3_table + 24], eax
+
     mov ecx, 0
 .map_p2_table:
     mov eax, 0x200000
@@ -83,6 +118,39 @@ start:
     inc ecx
     cmp ecx, 512
     jne .map_p2_table
+
+    mov ecx, 0
+.map_p2_table_2:
+    mov eax, 0x200000
+    mul ecx
+    add eax, 0x40000000
+    or eax, 0b10000011
+    mov [p2_table_2 + ecx * 8], eax
+    inc ecx
+    cmp ecx, 512
+    jne .map_p2_table_2
+
+    mov ecx, 0
+.map_p2_table_3:
+    mov eax, 0x200000
+    mul ecx
+    add eax, 0x80000000
+    or eax, 0b10000011
+    mov [p2_table_3 + ecx * 8], eax
+    inc ecx
+    cmp ecx, 512
+    jne .map_p2_table_3
+
+    mov ecx, 0
+.map_p2_table_4:
+    mov eax, 0x200000
+    mul ecx
+    add eax, 0xC0000000
+    or eax, 0b10000011
+    mov [p2_table_4 + ecx * 8], eax
+    inc ecx
+    cmp ecx, 512
+    jne .map_p2_table_4
 
     ; Load P4 to CR3
     mov eax, p4_table
@@ -175,6 +243,7 @@ long_mode_start:
 
     lidt [idt64_ptr]
 
+    mov rdi, [mb2_info_ptr]
     call kernel_main
 
     cli

@@ -2,6 +2,7 @@
 #include <stddef.h>
 
 #include "console.h"
+#include "framebuffer.h"
 #include "fs/fat.h"
 #include "io.h"
 #include "keyboard.h"
@@ -528,7 +529,11 @@ static void execute_command(const char *line)
     console_write("Unknown command. Type 'help'.\n");
 }
 
+#if defined(__x86_64__) || defined(__amd64__)
+void kernel_main(void *mb2_info)
+#else
 void kernel_main(void)
+#endif
 {
     console_clear();
     console_write("Kernel C loaded.\n");
@@ -542,6 +547,13 @@ void kernel_main(void)
     console_write("x86 kernel (64-bit, C, VGA)\n");
 #else
     console_write("x86 kernel (32-bit, C, VGA)\n");
+#endif
+
+#if defined(__x86_64__) || defined(__amd64__)
+    if (fb_init(mb2_info) == 0)
+    {
+        fb_demo();
+    }
 #endif
     print_prompt();
 
